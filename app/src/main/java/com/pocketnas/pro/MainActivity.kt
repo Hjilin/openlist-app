@@ -145,7 +145,7 @@ private fun AppNavHost(
         modifier = modifier,
     ) {
         composable("home") { DashboardScreen(vm, navController) }
-        composable("files") { FileBrowserScreen(vm, navController) }
+        composable("files") { FileBrowserScreen(vm, onBack = {}, onOpenStorages = { navController.navigate("storages") }) }
         composable("transfer") { TransferScreen(vm, navController) }
         composable("music") { MusicScreen(vm, navController) }
         composable("me") { MeScreen(vm, navController) }
