@@ -90,7 +90,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         transferEngine.restore()
         // 启动即校验 token：被内核吊销（外部登录/重启签发新 secret）时自动用保存的账号重登
-        viewModelScope.launch {
+        // 必须跑在 IO 线程：waitTcpReady 探测不能阻塞主线程，否则 Compose 首帧卡 20 秒白屏
+        viewModelScope.launch(Dispatchers.IO) {
             autoRevalidateToken()
         }
         // 周期自动刷新（30s）：内核重启 / token 被吊销后自动重登并恢复数据，无需手动重启 App
@@ -192,7 +193,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 java.net.Socket("127.0.0.1", 5244).use { return true }
             } catch (_: Exception) {
-                Thread.sleep(500); waited += 500
+                // 用 delay 挂起而非 Thread.sleep：绝不阻塞调用线程（主线程）
+                delay(500); waited += 500
             }
         }
         return false
