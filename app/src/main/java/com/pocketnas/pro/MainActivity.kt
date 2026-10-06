@@ -40,7 +40,6 @@ import com.pocketnas.pro.ui.AppViewModel
 import com.pocketnas.pro.ui.screens.DashboardScreen
 import com.pocketnas.pro.ui.screens.FileBrowserScreen
 import com.pocketnas.pro.ui.screens.LogScreen
-import com.pocketnas.pro.ui.screens.LoginScreen
 import com.pocketnas.pro.ui.screens.MediaLibraryScreen
 import com.pocketnas.pro.ui.screens.SettingsScreen
 import com.pocketnas.pro.ui.screens.StorageAddScreen
@@ -101,16 +100,6 @@ private val tabs = listOf(
 private fun AppRoot(vm: AppViewModel = viewModel()) {
     val loggedIn by vm.loggedIn.collectAsState()
     val navController = rememberNavController()
-
-    if (!loggedIn) {
-        val error by vm.loginError.collectAsState()
-        LoginScreen(
-            onLogin = { u, p -> vm.login(u, p) },
-            onFirstSetup = { navController.navigate("webadmin") },
-            error = error,
-        )
-        return
-    }
 
     Scaffold(
         bottomBar = {
