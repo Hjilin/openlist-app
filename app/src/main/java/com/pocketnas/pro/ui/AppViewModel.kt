@@ -116,24 +116,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * 启动时校验 token：若失效则自动重新登录（用 AppSettingStore 保存的账号，
-     * 未保存时回退默认 admin/admin123456），使存储/文件/驱动列表恢复可见。
+     * 未保存时从内核日志解析随机密码或回退默认），使存储/文件/驱动列表恢复可见。
      */
     private suspend fun autoRevalidateToken() {
         val ctx = getApplication<Application>()
-        val sockFile = BinaryUtil.socketFile(ctx)
-        var waited = 0
-        while (!sockFile.exists() && waited < 40) {
-            kotlinx.coroutines.delay(500)
-            waited++
+        OpenListService.start(ctx)
+        if (!waitTcpReady()) {
+            LogStore.log("AUTH", "内核 TCP 未就绪，启动校验跳过")
+            return
         }
-        if (!sockFile.exists()) return
         val current = _token.value ?: return
         val valid = safeApi { api().authCheck(current) } == true
         if (!valid) {
             LogStore.log("AUTH", "token 已失效（可能被外部登录吊销），自动重新登录")
             val saved = AppSettingStore.getSavedLogin(ctx)
             val user = saved.first.ifBlank { "admin" }
-            val pass = saved.second.ifBlank { "admin123456" }
+            val pass = resolveAdminPassword()
             login(user, pass)
         }
     }
@@ -143,25 +141,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         withContext(Dispatchers.IO) {
             try {
                 OpenListService.start(getApplication())
-                // 等待 TCP 5244 真能连上（官方版内核）
-                var waited = 0
-                var tcpReady = false
-                while (waited < 40) {
-                    try {
-                        java.net.Socket("127.0.0.1", 5244).use { tcpReady = true }
-                        break
-                    } catch (_: Exception) {
-                        Thread.sleep(500); waited++
-                    }
-                }
-                if (!tcpReady) {
-                    LogStore.log("AUTH", "TCP 5244 等待超时(${waited * 500}ms)")
+                // 等待 TCP 5244 真能连上（官方版内核只监听 TCP）
+                if (!waitTcpReady()) {
+                    LogStore.log("AUTH", "TCP 5244 等待超时")
                     return@withContext null
                 }
-                var tok = api().login(username.trim(), password)
+                val pass = password.ifBlank { resolveAdminPassword() }
+                var tok = api().login(username.trim(), pass)
                 if (tok == null) {
                     api().initSetup("admin", "admin123456")
-                    tok = api().login(username.trim(), password)
+                    tok = api().login(username.trim(), pass)
                 }
                 tok
             } catch (e: Exception) {
@@ -179,7 +168,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         val saved = AppSettingStore.getSavedLogin(getApplication())
         val user = saved.first.ifBlank { "admin" }
-        val pass = saved.second.ifBlank { "admin123456" }
+        val pass = saved.second.ifBlank { resolveAdminPassword() }
         val tok = loginNow(user, pass)
         if (tok != null) {
             _token.value = tok
@@ -196,6 +185,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return OpenListApi(LocalHttpClient.tcp())
     }
 
+    /** 等待内核 TCP 5244 就绪（官方版内核只监听 TCP，不创建 unix socket） */
+    private suspend fun waitTcpReady(timeoutMs: Long = 20_000): Boolean {
+        var waited = 0L
+        while (waited < timeoutMs) {
+            try {
+                java.net.Socket("127.0.0.1", 5244).use { return true }
+            } catch (_: Exception) {
+                Thread.sleep(500); waited += 500
+            }
+        }
+        return false
+    }
+
+    /**
+     * 解析内核自动生成的随机管理员密码。
+     * 官方 OpenList 内核首次启动会自动创建 admin 并打印随机密码：
+     *   Successfully created the admin user and the initial password is: xxxxxxxx
+     * 从 NasState 日志缓冲中匹配该行并提取密码。
+     */
+    private fun resolveAdminPasswordFromLogs(): String? {
+        val lines = NasState.logs.value ?: return null
+        for (line in lines) {
+            val m = Regex("initial password is: (\\S+)", RegexOption.IGNORE_CASE).find(line)
+            if (m != null) return m.groupValues[1]
+        }
+        return null
+    }
+
+    /** 获取可用的管理员密码：优先用已保存的，其次从内核日志解析随机密码，最后回退默认 */
+    private fun resolveAdminPassword(): String {
+        val saved = AppSettingStore.getSavedLogin(getApplication()).second
+        if (saved.isNotBlank() && saved != "admin123456") return saved
+        return resolveAdminPasswordFromLogs() ?: "admin123456"
+    }
+
     /**
      * 安全调用内核 API：IO 线程 + 全量 catch。
      * 内核未就绪/重启/被杀时返回 null 而不是抛异常崩溃（修复冷启动首次打开闪退）。
@@ -208,34 +232,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             null
         }
 
-    /** 登录（走 unix socket，绝不经过网页）；首次未初始化时自动用 admin/admin123456 完成安装向导 */
+    /**
+     * 登录（走内核 TCP 5244，绝不经过网页）；首次未初始化时自动用 admin + 随机密码完成安装向导。
+     * 密码优先级：用户传入 > 已保存 > 内核日志解析的随机密码 > 默认 admin123456。
+     */
     fun login(username: String, password: String) {
         viewModelScope.launch {
             _loginError.value = null
             val result = withContext(Dispatchers.IO) {
                 try {
-                    // 确保内核前台服务在运行（登录前拉起，防止 socket 未就绪崩溃）
+                    // 确保内核前台服务在运行（登录前拉起，防止内核未就绪崩溃）
                     OpenListService.start(getApplication())
-                    // 等待内核 unix socket 就绪（最长 20s，每 500ms 探测一次）
-                    val sockFile = BinaryUtil.socketFile(getApplication())
-                    var waited = 0
-                    while (!sockFile.exists() && waited < 40) {
-                        Thread.sleep(500)
-                        waited++
-                    }
-                    if (!sockFile.exists()) {
-                        LogStore.log("AUTH", "内核 socket 未就绪（超时 20s），登录终止")
+                    // 等待内核 TCP 5244 就绪（最长 20s）
+                    if (!waitTcpReady()) {
+                        LogStore.log("AUTH", "内核 TCP 未就绪（超时 20s），登录终止")
                         return@withContext null
                     }
-                    var tok = api().login(username.trim(), password)
+                    val pass = password.ifBlank { resolveAdminPassword() }
+                    var tok = api().login(username.trim(), pass)
                     if (tok == null) {
-                        // 系统可能未初始化（内核不自动建 admin）——调用安装向导创建默认管理员
+                        // 系统可能未初始化——调用安装向导创建管理员
                         val initialized = api().initSetup("admin", "admin123456")
                         LogStore.log(
                             "AUTH",
                             if (initialized) "检测到未初始化，已创建默认管理员 admin" else "系统已初始化或向导不可用",
                         )
-                        if (initialized) tok = api().login(username.trim(), password)
+                        if (initialized) tok = api().login(username.trim(), pass)
+                    }
+                    if (tok == null && pass != "admin123456") {
+                        // 随机密码可能已轮换，回退默认密码再试一次
+                        tok = api().login(username.trim(), "admin123456")
                     }
                     tok
                 } catch (e: Exception) {
@@ -250,7 +276,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 LogStore.log("AUTH", "登录成功: $username")
                 refreshAll()
             } else {
-                _loginError.value = "登录失败：内核未就绪或账号密码错误（首次安装默认 admin / admin123456）"
+                _loginError.value = "登录失败：内核未就绪或账号密码错误（首次安装请点「打开后台」按网页提示设置密码）"
                 LogStore.log("AUTH", "登录失败: $username")
             }
         }
