@@ -96,28 +96,13 @@ private fun AppRoot(vm: AppViewModel = viewModel()) {
 
     Scaffold(
         topBar = {
-            // 顶部搜索栏
             TopAppBar(
-                title = {
-                    OutlinedTextField(
-                        value = "",
-                        onValueChange = {},
-                        placeholder = { Text("搜索云盘文件", style = androidx.compose.ui.text.TextStyle(androidx.compose.ui.unit.TextUnit.Unspecified)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Gray) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
-                    )
-                },
+                title = { Text("简云plas", style = androidx.compose.ui.text.TextStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)) },
                 actions = {
                     IconButton(onClick = { navController.navigate("settings") }) {
                         Icon(Icons.Default.Settings, contentDescription = "设置")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = androidx.compose.ui.graphics.Color.White,
-                    titleContentColor = androidx.compose.ui.graphics.Color.Black,
-                ),
             )
         },
         bottomBar = {
