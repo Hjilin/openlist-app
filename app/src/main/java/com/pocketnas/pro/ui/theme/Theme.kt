@@ -7,22 +7,25 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+val BluePrimary = Color(0xFF2F6BFF)
+val BluePurple = Color(0xFF6A5CFF)
+val BgLight = Color(0xFFF3F5F9)
+
 private val LightColors = lightColorScheme(
-    primary = Color(0xFFFB7A3D),
+    primary = BluePrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFE8D6),
-    onPrimaryContainer = Color(0xFF4A2000),
-    secondary = Color(0xFF34C759),
-    background = Color(0xFFF5F5F7),
+    primaryContainer = Color(0xFFE8EFFF),
+    onPrimaryContainer = Color(0xFF0A1F4D),
+    secondary = BluePurple,
+    background = BgLight,
     surface = Color.White,
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF9DB8FF),
-    onPrimary = Color(0xFF002878),
-    primaryContainer = Color(0xFF0040A8),
-    onPrimaryContainer = Color(0xFFDCE3FF),
-    secondary = Color(0xFF4CDBE2),
+    primary = Color(0xFF7AA0FF),
+    onPrimary = Color(0xFF0A1F4D),
+    primaryContainer = Color(0xFF1E3A8A),
+    secondary = Color(0xFF9D8FFF),
     background = Color(0xFF101318),
     surface = Color(0xFF171A20),
 )

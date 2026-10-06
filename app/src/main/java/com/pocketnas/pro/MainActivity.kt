@@ -14,20 +14,17 @@ import com.pocketnas.pro.core.AppSettingStore
 import java.util.Locale
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,13 +36,14 @@ import androidx.navigation.compose.rememberNavController
 import com.pocketnas.pro.ui.AppViewModel
 import com.pocketnas.pro.ui.screens.DashboardScreen
 import com.pocketnas.pro.ui.screens.FileBrowserScreen
+import com.pocketnas.pro.ui.screens.TransferScreen
+import com.pocketnas.pro.ui.screens.MusicScreen
+import com.pocketnas.pro.ui.screens.MeScreen
 import com.pocketnas.pro.ui.screens.LogScreen
-import com.pocketnas.pro.ui.screens.MediaLibraryScreen
 import com.pocketnas.pro.ui.screens.SettingsScreen
-import com.pocketnas.pro.ui.screens.StorageAddScreen
-import com.pocketnas.pro.ui.screens.StorageScreen
-import com.pocketnas.pro.ui.screens.UsersScreen
 import com.pocketnas.pro.ui.screens.WebAdminScreen
+import com.pocketnas.pro.ui.screens.StorageScreen
+import com.pocketnas.pro.ui.screens.StorageAddScreen
 import com.pocketnas.pro.ui.theme.PocketNasTheme
 
 class MainActivity : ComponentActivity() {
@@ -85,20 +83,17 @@ private data class TabItem(
     val icon: ImageVector,
 )
 
-// 底部导航：仪表盘 / 文件 / 媒体库 / 用户 / 日志 / 设置（存储源并入文件页）
 private val tabs = listOf(
-    TabItem("dashboard", "仪表盘", Icons.Default.Dashboard),
+    TabItem("home", "首页", Icons.Default.Home),
     TabItem("files", "文件", Icons.Default.Folder),
-    TabItem("media", "媒体库", Icons.Default.PhotoLibrary),
-    TabItem("users", "用户", Icons.Default.Groups),
-    TabItem("logs", "日志", Icons.Default.Terminal),
-    TabItem("settings", "设置", Icons.Default.Settings),
+    TabItem("transfer", "传输", Icons.Default.Upload),
+    TabItem("music", "音乐", Icons.Default.MusicNote),
+    TabItem("me", "我的", Icons.Default.Person),
 )
 
 @androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 private fun AppRoot(vm: AppViewModel = viewModel()) {
-    val loggedIn by vm.loggedIn.collectAsState()
     val navController = rememberNavController()
 
     Scaffold(
@@ -138,44 +133,18 @@ private fun AppNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = "dashboard",
+        startDestination = "home",
         modifier = modifier,
     ) {
-        composable("dashboard") {
-            DashboardScreen(
-                vm = vm,
-                onOpenLogs = { navController.navigate("logs") },
-                onOpenFiles = { navController.navigate("files") },
-                onOpenWebAdmin = { navController.navigate("webadmin") },
-            )
-        }
-        composable("files") {
-            FileBrowserScreen(
-                vm = vm,
-                onBack = { navController.popBackStack() },
-                onOpenStorages = { navController.navigate("storages") },
-            )
-        }
-        composable("media") {
-            MediaLibraryScreen(vm)
-        }
-        // 存储源管理：从文件页进入，不占底部 tab
-        composable("storages") {
-            StorageScreen(
-                vm = vm,
-                onAdd = { navController.navigate("storage_add") },
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable("storage_add") {
-            StorageAddScreen(
-                vm = vm,
-                onBack = { navController.popBackStack() },
-            )
-        }
-        composable("users") { UsersScreen(vm) }
+        composable("home") { DashboardScreen(vm, navController) }
+        composable("files") { FileBrowserScreen(vm, navController) }
+        composable("transfer") { TransferScreen(vm, navController) }
+        composable("music") { MusicScreen(vm, navController) }
+        composable("me") { MeScreen(vm, navController) }
+        composable("webadmin") { WebAdminScreen(onBack = { navController.popBackStack() }) }
         composable("logs") { LogScreen() }
         composable("settings") { SettingsScreen(vm, onOpenWebAdmin = { navController.navigate("webadmin") }, onOpenStorages = { navController.navigate("storages") }) }
-        composable("webadmin") { WebAdminScreen(onBack = { navController.popBackStack() }) }
+        composable("storages") { StorageScreen(vm, onAdd = { navController.navigate("storage_add") }, onBack = { navController.popBackStack() }) }
+        composable("storage_add") { StorageAddScreen(vm, onBack = { navController.popBackStack() }) }
     }
 }
