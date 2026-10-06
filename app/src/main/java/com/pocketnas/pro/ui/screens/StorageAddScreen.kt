@@ -154,11 +154,19 @@ fun StorageAddScreen(
                         }
                     }
                     if (drivers.isEmpty()) {
+                        Spacer(Modifier.height(8.dp))
                         Text(
-                            "驱动列表为空（内核未运行或接口异常）",
+                            "内核未启动，请先启动服务",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { vm.startService() },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("启动内核服务")
+                        }
                     }
                 }
             }
