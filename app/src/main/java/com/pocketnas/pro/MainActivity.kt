@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import com.pocketnas.pro.core.AppSettingStore
+import com.pocketnas.pro.core.LogStore
 import java.util.Locale
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -64,13 +65,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LogStore.log("UI", "MainActivity.onCreate 开始")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         setContent {
+            LogStore.log("UI", "setContent 进入")
             PocketNasTheme {
                 AppRoot()
             }
+            LogStore.log("UI", "setContent 完成")
         }
     }
 }
