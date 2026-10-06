@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import com.pocketnas.pro.core.AppSettingStore
 @Composable
 fun LoginScreen(
     onLogin: (String, String) -> Unit,
+    onFirstSetup: () -> Unit,
     error: String?,
 ) {
     val context = LocalContext.current
@@ -47,7 +49,7 @@ fun LoginScreen(
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text(
-                    text = "Openlist",
+                    text = "简云plas",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -112,15 +114,15 @@ fun LoginScreen(
                     Text("登录")
                 }
                 Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "首次使用：账号 admin，密码 admin123456（登录后请在用户页修改）",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
+                OutlinedButton(
+                    onClick = onFirstSetup,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("首次使用？打开网页设置密码")
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "通信走本地安全通道，不经过网页",
+                    text = "首次打开先点上面按钮设置管理员密码，再回这里登录",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.CenterHorizontally),

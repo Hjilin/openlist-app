@@ -106,6 +106,7 @@ private fun AppRoot(vm: AppViewModel = viewModel()) {
         val error by vm.loginError.collectAsState()
         LoginScreen(
             onLogin = { u, p -> vm.login(u, p) },
+            onFirstSetup = { navController.navigate("webadmin") },
             error = error,
         )
         return

@@ -50,3 +50,9 @@ object BinaryUtil {
         if (sock.exists()) sock.delete()
     }
 }
+
+    /** 清空 openlist 数据目录（重置管理员账号用） */
+    fun clearData(context: Context) {
+        dataDir(context).deleteRecursively()
+        dataDir(context).mkdirs()
+    }
