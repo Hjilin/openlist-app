@@ -41,9 +41,9 @@ fun TransferScreen(vm: AppViewModel, nav: NavHostController) {
         }
 
         // 示例传输项
-        TransferItem("OpenClaw-Termux 安装包.apk", "上传中", "5.1 MB/s · 剩余 1 分 12 秒", 0.72, false)
-        TransferItem("红米K60 刷机资料", "离线下载", "2.4 MB/s · 剩余 12 分", 0.38, false)
-        TransferItem("电影合集", "转存", "排队中", 0.12, false)
+        TransferItem("OpenClaw-Termux 安装包.apk", "上传中", "5.1 MB/s · 剩余 1 分 12 秒", 0.72f, false)
+        TransferItem("红米K60 刷机资料", "离线下载", "2.4 MB/s · 剩余 12 分", 0.38f, false)
+        TransferItem("电影合集", "转存", "排队中", 0.12f, false)
 
         // 已完成
         Row(

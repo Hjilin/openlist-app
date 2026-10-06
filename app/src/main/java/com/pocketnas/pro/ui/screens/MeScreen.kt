@@ -1,4 +1,6 @@
 package com.pocketnas.pro.ui.screens
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.background
