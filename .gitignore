@@ -1,0 +1,12 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.kotlin/
+app/src/main/jniLibs/arm64-v8a/libopenlist.so
+app/src/main/jniLibs/arm64-v8a/*.bak

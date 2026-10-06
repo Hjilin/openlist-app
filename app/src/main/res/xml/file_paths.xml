@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 日志导出目录（外部私有空间） -->
+    <external-files-path name="logs_export" path="logs_export/" />
+    <!-- 本地磁盘系统打开（允许整个文件系统） -->
+    <root-path name="root" path="." />
+</paths>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">简云plas</string>
+    <!-- app_version 由 build.gradle.kts 的 resValue 注入 -->
+</resources>
