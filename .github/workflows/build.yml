@@ -37,7 +37,7 @@ jobs:
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a
           cd /tmp
-          curl -fL -o openlist.tar.gz "https://github.com/OpenListTeam/OpenList/releases/download/v4.2.6/openlist-linux-musl-arm64.tar.gz"
+          curl -fL -o openlist.tar.gz "https://github.com/OpenListTeam/OpenList/releases/download/v4.2.6/openlist-android-arm64-lite.tar.gz"
           tar xzf openlist.tar.gz
           cp openlist /home/runner/work/openlist-app/openlist-app/app/src/main/jniLibs/arm64-v8a/libopenlist.so
           chmod +x /home/runner/work/openlist-app/openlist-app/app/src/main/jniLibs/arm64-v8a/libopenlist.so
