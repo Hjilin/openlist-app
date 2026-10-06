@@ -66,6 +66,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LogStore.log("UI", "MainActivity.onCreate 开始")
+        // 引导授权"所有文件访问"，使公共日志目录 Download/PocketNAS_logs 可写
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            !android.os.Environment.isExternalStorageManager()
+        ) {
+            try {
+                val i = android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")
+                )
+                startActivity(i)
+            } catch (_: Exception) {}
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }

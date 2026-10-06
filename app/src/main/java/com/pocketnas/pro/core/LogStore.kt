@@ -30,6 +30,7 @@ object LogStore {
     private val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
     private val executor = Executors.newSingleThreadExecutor()
     private var dir: File? = null
+    private var pubDir: File? = null
     private var appContext: Context? = null
 
     /** 初始化日志目录（应用启动时调用一次） */
@@ -37,7 +38,19 @@ object LogStore {
         appContext = context.applicationContext
         if (dir != null) return
         dir = File(context.getExternalFilesDir(null), LOG_DIR).apply { mkdirs() }
+        // 公共镜像目录：Download/PocketNAS_logs，任何文件管理器直接可见
+        try {
+            pubDir = File(
+                android.os.Environment.getExternalStoragePublicDirectory(
+                    android.os.Environment.DIRECTORY_DOWNLOADS
+                ),
+                "PocketNAS_logs"
+            ).apply { mkdirs() }
+        } catch (_: Exception) {}
     }
+
+    /** 公共镜像日志目录（白屏/闪退时无需进 Android/data 直接读取） */
+    fun publicLogDir(): File? = pubDir
 
     /** 便捷写日志（使用已初始化的应用上下文） */
     fun log(tag: String, msg: String) {
@@ -50,7 +63,7 @@ object LogStore {
 
     fun logFile(context: Context): File = File(logDir(context), LOG_NAME)
 
-    /** 追加一条日志：时间戳 [TAG] 消息 */
+    /** 追加一条日志：时间戳 [TAG] 消息（私有 + 公共双写，公共失败忽略） */
     fun log(context: Context, tag: String, msg: String) {
         val line = "${fmt.format(Date())} [$tag] $msg\n"
         executor.execute {
@@ -59,6 +72,12 @@ object LogStore {
                     val f = logFile(context)
                     rotateIfNeeded(f)
                     f.appendText(line)
+                } catch (_: Exception) {}
+                try {
+                    val p = pubDir ?: return@execute
+                    val pf = File(p, LOG_NAME)
+                    if (pf.length() > MAX_BYTES) { pf.delete(); File(p, "$LOG_NAME.1").delete() }
+                    pf.appendText(line)
                 } catch (_: Exception) {}
             }
         }

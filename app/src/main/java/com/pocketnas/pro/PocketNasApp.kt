@@ -61,6 +61,11 @@ class PocketNasApp : Application() {
                 try {
                     File(filesDir, "crash.log").appendText(sb.toString())
                 } catch (_: Exception) {}
+                // 公共镜像：Download/PocketNAS_logs（无需进 Android/data）
+                try {
+                    val pub = com.pocketnas.pro.core.LogStore.publicLogDir()
+                    if (pub != null) File(pub, "crash.log").appendText(sb.toString())
+                } catch (_: Exception) {}
             } catch (_: Exception) {}
             prev?.uncaughtException(thread, throwable)
         }
