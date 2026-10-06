@@ -144,7 +144,7 @@ private fun AppNavHost(
         composable("webadmin") { WebAdminScreen(onBack = { navController.popBackStack() }) }
         composable("logs") { LogScreen() }
         composable("settings") { SettingsScreen(vm, onOpenWebAdmin = { navController.navigate("webadmin") }, onOpenStorages = { navController.navigate("storages") }) }
-        composable("storages") { StorageScreen(vm, navController) }
+        composable("storages") { StorageScreen(vm, onAdd = { navController.navigate("storage_add") }, onBack = { navController.popBackStack() }) }
         composable("storage_add") { StorageAddScreen(vm, onBack = { navController.popBackStack() }) }
     }
 }
