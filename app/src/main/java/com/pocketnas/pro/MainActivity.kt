@@ -19,11 +19,9 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -97,6 +95,31 @@ private fun AppRoot(vm: AppViewModel = viewModel()) {
     val navController = rememberNavController()
 
     Scaffold(
+        topBar = {
+            // 顶部搜索栏
+            TopAppBar(
+                title = {
+                    OutlinedTextField(
+                        value = "",
+                        onValueChange = {},
+                        placeholder = { Text("搜索云盘文件", style = androidx.compose.ui.text.TextStyle(androidx.compose.ui.unit.TextUnit.Unspecified)) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = androidx.compose.ui.graphics.Color.Gray) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                    )
+                },
+                actions = {
+                    IconButton(onClick = { navController.navigate("settings") }) {
+                        Icon(Icons.Default.Settings, contentDescription = "设置")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.ui.graphics.Color.White,
+                    titleContentColor = androidx.compose.ui.graphics.Color.Black,
+                ),
+            )
+        },
         bottomBar = {
             NavigationBar {
                 tabs.forEach { tab ->
@@ -137,7 +160,7 @@ private fun AppNavHost(
         modifier = modifier,
     ) {
         composable("home") { DashboardScreen(vm, navController) }
-        composable("files") { FileBrowserScreen(vm, onBack = {}, onOpenStorages = { navController.navigate("storages") }) }
+        composable("files") { FileBrowserScreen(vm, navController) }
         composable("transfer") { TransferScreen(vm, navController) }
         composable("music") { MusicScreen(vm, navController) }
         composable("me") { MeScreen(vm, navController) }
