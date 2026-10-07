@@ -115,8 +115,12 @@ private fun AppRoot(vm: AppViewModel = viewModel()) {
             TopAppBar(
                 title = { Text("简云plas", style = androidx.compose.ui.text.TextStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)) },
                 actions = {
-                    IconButton(onClick = { navController.navigate("settings") }) {
-                        Icon(Icons.Default.Settings, contentDescription = "设置")
+                    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+                    // 设置图标只在首页显示，其他页面（文件/传输/音乐/我的等）不显示
+                    if (currentRoute == "home") {
+                        IconButton(onClick = { navController.navigate("settings") }) {
+                            Icon(Icons.Default.Settings, contentDescription = "设置")
+                        }
                     }
                 },
             )
