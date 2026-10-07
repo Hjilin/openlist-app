@@ -163,6 +163,9 @@ fun FileBrowserScreen(
     var localMode by rememberSaveable { mutableStateOf(false) }
     var menuTarget by remember { mutableStateOf<OpenListApi.FsObj?>(null) }
     var menuExpanded by remember { mutableStateOf(false) }
+    // ---- 单击文件弹出的操作菜单 ----
+    var actionTarget by remember { mutableStateOf<OpenListApi.FsObj?>(null) }
+    var actionSheetOpen by remember { mutableStateOf(false) }
 
     var mkdirDialog by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<OpenListApi.FsObj?>(null) }
@@ -344,6 +347,18 @@ fun FileBrowserScreen(
                                     text = { Text("刷新") },
                                     onClick = { moreExpanded = false; vm.loadFs(currentPath) },
                                 )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("新建文件夹") },
+                                    onClick = { moreExpanded = false; mkdirDialog = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("上传文件") },
+                                    onClick = {
+                                        moreExpanded = false
+                                        uploadLauncher.launch(arrayOf("*/*"))
+                                    },
+                                )
                             }
                         }
                     }
@@ -484,7 +499,11 @@ fun FileBrowserScreen(
                                         selected = toggle(selected, obj.name)
                                         if (selected.isEmpty()) selMode = false
                                     } else {
-                                        tryOpen(obj)
+                                        // 单击：文件夹进入目录；文件弹出操作菜单
+                                        if (obj.isDir) tryOpen(obj) else {
+                                            actionTarget = obj
+                                            actionSheetOpen = true
+                                        }
                                     }
                                 },
                                 onLongClick = {
@@ -521,7 +540,11 @@ fun FileBrowserScreen(
                                         selected = toggle(selected, obj.name)
                                         if (selected.isEmpty()) selMode = false
                                     } else {
-                                        tryOpen(obj)
+                                        // 单击：文件夹进入目录；文件弹出操作菜单
+                                        if (obj.isDir) tryOpen(obj) else {
+                                            actionTarget = obj
+                                            actionSheetOpen = true
+                                        }
                                     }
                                 },
                                 onLongClick = {
@@ -589,6 +612,94 @@ fun FileBrowserScreen(
                     deleteTarget = target
                 },
             )
+        }
+    }
+
+    // ---- 单击文件操作弹窗（对齐网盘习惯：点文件弹出操作菜单）----
+    actionTarget?.let { target ->
+        if (actionSheetOpen) {
+            ModalBottomSheet(
+                onDismissRequest = { actionSheetOpen = false },
+                sheetState = rememberModalBottomSheetState(),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                    // 文件信息
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            if (target.isDir) Icons.Default.Folder else Icons.Default.OpenInNew,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                target.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                formatSize(target.size),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    ActionSheetRow(Icons.Default.OpenInNew, "打开") {
+                        actionSheetOpen = false
+                        tryOpen(target)
+                    }
+                    if (!target.isDir) {
+                        ActionSheetRow(Icons.Default.Download, "下载") {
+                            actionSheetOpen = false
+                            vm.startDownload(joinPath(currentPath, target.name), target.name, target.size)
+                        }
+                    }
+                    ActionSheetRow(Icons.Default.EditNote, "重命名") {
+                        actionSheetOpen = false
+                        renameTarget = target
+                    }
+                    ActionSheetRow(Icons.Default.DriveFileMove, "移动") {
+                        actionSheetOpen = false
+                        moveCopy = MoveCopy(currentPath, listOf(target.name), false)
+                    }
+                    ActionSheetRow(Icons.Default.ContentCopy, "复制") {
+                        actionSheetOpen = false
+                        moveCopy = MoveCopy(currentPath, listOf(target.name), true)
+                    }
+                    val pwdKey = joinPath(currentPath, target.name)
+                    ActionSheetRow(
+                        Icons.Default.Lock,
+                        if (passStore.has(pwdKey)) "修改密码" else "设置密码",
+                    ) {
+                        actionSheetOpen = false
+                        pwdDialog = PwdDialogState(
+                            key = pwdKey,
+                            title = if (passStore.has(pwdKey)) "修改密码" else "设置密码",
+                            isVerify = false,
+                            obj = target,
+                        )
+                    }
+                    ActionSheetRow(Icons.Default.Delete, "删除", danger = true) {
+                        actionSheetOpen = false
+                        deleteTarget = target
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    ActionSheetRow(Icons.Default.CreateNewFolder, "新建文件夹") {
+                        actionSheetOpen = false
+                        mkdirDialog = true
+                    }
+                    ActionSheetRow(Icons.Default.Upload, "上传文件") {
+                        actionSheetOpen = false
+                        uploadLauncher.launch(arrayOf("*/*"))
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
         }
     }
 
@@ -899,6 +1010,35 @@ private fun SelectionActionBar(
                 ActionItem(Icons.Default.Close, "取消") { onCancel() }
             }
         }
+    }
+}
+
+/** 操作弹窗行：图标+文字，点击执行 */
+@Composable
+private fun ActionSheetRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    danger: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.width(14.dp))
+        Text(
+            label,
+            fontSize = 15.sp,
+            color = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
