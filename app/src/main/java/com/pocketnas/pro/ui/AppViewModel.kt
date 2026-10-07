@@ -406,6 +406,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 移动文件到目标目录 */
+    fun move(srcDir: String, dstDir: String, names: List<String>) {
+        viewModelScope.launch {
+            val t = ensureToken() ?: return@launch
+            val ok = safeApi { api().fsMove(t, srcDir, dstDir, names) } ?: false
+            _notice.value = if (ok) "移动成功" else "移动失败"
+        }
+    }
+
+    /** 复制文件到目标目录 */
+    fun copy(srcDir: String, dstDir: String, names: List<String>) {
+        viewModelScope.launch {
+            val t = ensureToken() ?: return@launch
+            val ok = safeApi { api().fsCopy(t, srcDir, dstDir, names) } ?: false
+            _notice.value = if (ok) "复制成功" else "复制失败"
+        }
+    }
+
+    /** 搜索文件，结果通过 [onResult] 回调 */
+    fun search(parent: String, keywords: String, onResult: (List<OpenListApi.SearchResult>) -> Unit) {
+        viewModelScope.launch {
+            val t = ensureToken() ?: return@launch
+            val r = safeApi { api().fsSearch(t, parent, keywords) } ?: emptyList()
+            onResult(r)
+        }
+    }
+
     fun upload(filePath: String, fileName: String, mime: String, stream: java.io.InputStream) {
         viewModelScope.launch {
             val t = ensureToken() ?: return@launch

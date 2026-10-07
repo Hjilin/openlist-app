@@ -391,6 +391,61 @@ class OpenListApi(private val client: LocalHttpClient) {
         return try { JSONObject(resp.body).optInt("code") == 200 } catch (_: Exception) { false }
     }
 
+    /** 移动：src_dir 源完整路径，dst_dir 目标目录，names 要移动的名字 */
+    fun fsMove(token: String, srcDir: String, dstDir: String, names: List<String>): Boolean {
+        val body = JSONObject()
+            .put("src_dir", srcDir)
+            .put("dst_dir", dstDir)
+            .put("names", JSONArray(names))
+            .toString()
+        val resp = client.post("/api/fs/move", body, token)
+        if (resp.code !in 200..299) return false
+        return try { JSONObject(resp.body).optInt("code") == 200 } catch (_: Exception) { false }
+    }
+
+    /** 复制：src_dir 源完整路径，dst_dir 目标目录，names 要复制的名字 */
+    fun fsCopy(token: String, srcDir: String, dstDir: String, names: List<String>): Boolean {
+        val body = JSONObject()
+            .put("src_dir", srcDir)
+            .put("dst_dir", dstDir)
+            .put("names", JSONArray(names))
+            .toString()
+        val resp = client.post("/api/fs/copy", body, token)
+        if (resp.code !in 200..299) return false
+        return try { JSONObject(resp.body).optInt("code") == 200 } catch (_: Exception) { false }
+    }
+
+    /**
+     * 搜索文件。parent 为搜索起点路径（如 "/"），keywords 关键词。
+     * 返回匹配的对象列表。
+     */
+    data class SearchResult(val name: String, val path: String, val isDir: Boolean)
+
+    fun fsSearch(token: String, parent: String, keywords: String, page: Int = 1, perPage: Int = 100): List<SearchResult> {
+        val body = JSONObject()
+            .put("parent", parent)
+            .put("keywords", keywords)
+            .put("page", page)
+            .put("per_page", perPage)
+            .toString()
+        val resp = client.post("/api/fs/search", body, token)
+        if (resp.code !in 200..299) return emptyList()
+        val json = try { JSONObject(resp.body) } catch (_: Exception) { return emptyList() }
+        if (json.optInt("code") != 200) return emptyList()
+        val data = json.optJSONObject("data") ?: return emptyList()
+        val arr = data.optJSONArray("content") ?: return emptyList()
+        val out = mutableListOf<SearchResult>()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            out += SearchResult(
+                name = o.optString("name"),
+                path = o.optString("parent"),
+                isDir = o.optBoolean("is_dir"),
+            )
+        }
+        return out
+    }
+
     /** 保存单个系统设置（如 ftp_public_host），body 为 SettingItem 数组 */
     fun saveSetting(token: String, key: String, value: String): Boolean {
         val item = JSONObject()

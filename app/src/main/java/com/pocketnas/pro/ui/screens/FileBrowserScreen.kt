@@ -45,6 +45,11 @@ import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -119,6 +124,12 @@ private data class PwdDialogState(
     val obj: OpenListApi.FsObj? = null,
 )
 
+/** 排序方式 */
+private enum class SortMode { Name, Size, Date }
+
+/** 移动/复制状态：srcDir 源目录，names 要操作的名字，isCopy 区分移动/复制 */
+private data class MoveCopy(val srcDir: String, val names: List<String>, val isCopy: Boolean)
+
 /**
  * 原生文件浏览器：目录浏览 / 新建 / 重命名 / 删除 / 长按多选 /
  * 分片上传（断点续传）/ 下载（断点续传）/ 传输任务管理。
@@ -161,6 +172,15 @@ fun FileBrowserScreen(
     var selMode by rememberSaveable { mutableStateOf(false) }
     var selected by remember { mutableStateOf(setOf<String>()) }
     var transfersSheet by remember { mutableStateOf(false) }
+
+    // ---- 排序 / 搜索 / 移动复制（第①项：文件管理补全操作）----
+    var sortMode by rememberSaveable { mutableStateOf(SortMode.Name) }
+    var sortExpanded by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<OpenListApi.SearchResult>?>(null) }
+    var moveCopy by remember { mutableStateOf<MoveCopy?>(null) }
+    var moveCopyTarget by remember { mutableStateOf("") }
 
     // ---- 密码保护：本地门禁 + 离开目录自动上锁 ----
     val passStore = remember { PassStore(context) }
@@ -216,6 +236,12 @@ fun FileBrowserScreen(
     }
 
     val content = listResult?.content ?: emptyList()
+    // 客户端排序：名称 / 大小（目录置顶）/ 修改时间
+    val sortedContent = when (sortMode) {
+        SortMode.Name -> content.sortedBy { it.name.lowercase() }
+        SortMode.Size -> content.sortedBy { if (it.isDir) Long.MIN_VALUE else it.size }
+        SortMode.Date -> content.sortedByDescending { it.modified }
+    }
     val runningCount = transfers.count { it.state == TransferEngine.State.Running }
 
     Scaffold(
@@ -289,6 +315,33 @@ fun FileBrowserScreen(
                         IconButton(onClick = { vm.loadFs(currentPath) }) {
                             Icon(Icons.Default.Refresh, contentDescription = "刷新")
                         }
+                        // 搜索
+                        IconButton(onClick = { searchOpen = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "搜索")
+                        }
+                        // 排序
+                        Box {
+                            IconButton(onClick = { sortExpanded = true }) {
+                                Icon(Icons.Default.Sort, contentDescription = "排序")
+                            }
+                            DropdownMenu(
+                                expanded = sortExpanded,
+                                onDismissRequest = { sortExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(if (sortMode == SortMode.Name) "✓ 按名称" else "按名称") },
+                                    onClick = { sortMode = SortMode.Name; sortExpanded = false },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (sortMode == SortMode.Size) "✓ 按大小" else "按大小") },
+                                    onClick = { sortMode = SortMode.Size; sortExpanded = false },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (sortMode == SortMode.Date) "✓ 按修改时间" else "按修改时间") },
+                                    onClick = { sortMode = SortMode.Date; sortExpanded = false },
+                                )
+                            }
+                        }
                     }
                 },
             )
@@ -334,6 +387,18 @@ fun FileBrowserScreen(
                         } else {
                             vm.showNotice("重命名仅支持单选")
                         }
+                        selMode = false
+                        selected = emptySet()
+                    },
+                    onMove = {
+                        val names = content.map { it.name }.filter { it in selected }
+                        moveCopy = MoveCopy(currentPath, names, false)
+                        selMode = false
+                        selected = emptySet()
+                    },
+                    onCopy = {
+                        val names = content.map { it.name }.filter { it in selected }
+                        moveCopy = MoveCopy(currentPath, names, true)
                         selMode = false
                         selected = emptySet()
                     },
@@ -403,7 +468,7 @@ fun FileBrowserScreen(
             when (viewMode) {
                 ViewMode.List -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        listItems(content, key = { it.name }) { obj ->
+                        listItems(sortedContent, key = { it.name }) { obj ->
                             FileRow(
                                 obj = obj,
                                 displayName = displayName(obj.name),
@@ -440,7 +505,7 @@ fun FileBrowserScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(8.dp),
                     ) {
-                        gridItems(content, key = { it.name }) { obj ->
+                        gridItems(sortedContent, key = { it.name }) { obj ->
                             GridFileItem(
                                 obj = obj,
                                 displayName = displayName(obj.name),
@@ -521,6 +586,113 @@ fun FileBrowserScreen(
                 },
             )
         }
+    }
+
+    // ---- 移动 / 复制对话框：输入目标目录（完整路径，如 /网盘/影视）----
+    moveCopy?.let { mc ->
+        AlertDialog(
+            onDismissRequest = { moveCopy = null },
+            title = { Text(if (mc.isCopy) "复制到" else "移动到") },
+            text = {
+                Column {
+                    Text("目标目录（从挂载点开始，如 /网盘/影视）", style = MaterialTheme.typography.labelMedium)
+                    OutlinedTextField(
+                        value = moveCopyTarget,
+                        onValueChange = { moveCopyTarget = it },
+                        placeholder = { Text("/") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "将 ${mc.names.size} 项${if (mc.isCopy) "复制" else "移动"}到目标目录",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val dst = moveCopyTarget.trim().ifBlank { "/" }
+                        if (mc.isCopy) vm.copy(mc.srcDir, dst, mc.names)
+                        else vm.move(mc.srcDir, dst, mc.names)
+                        moveCopy = null
+                        moveCopyTarget = ""
+                    }
+                ) { Text(if (mc.isCopy) "复制" else "移动") }
+            },
+            dismissButton = {
+                TextButton(onClick = { moveCopy = null; moveCopyTarget = "" }) { Text("取消") }
+            },
+        )
+    }
+
+    // ---- 搜索对话框：内核 /api/fs/search，结果点击进入所在目录 ----
+    if (searchOpen) {
+        AlertDialog(
+            onDismissRequest = { searchOpen = false; searchResults = null; searchQuery = "" },
+            title = { Text("搜索文件") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = {
+                            searchQuery = it
+                            if (it.isNotBlank()) {
+                                vm.search("/", it) { r -> searchResults = r }
+                            } else {
+                                searchResults = null
+                            }
+                        },
+                        placeholder = { Text("输入关键词搜索（从根目录）") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    val results = searchResults
+                    if (results != null) {
+                        if (results.isEmpty()) {
+                            Text("无匹配结果", modifier = Modifier.padding(top = 12.dp))
+                        } else {
+                            LazyColumn(modifier = Modifier.heightIn(max = 300.dp).padding(top = 8.dp)) {
+                                listItems(results.size) { i ->
+                                    val r = results[i]
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                val targetDir = joinPath(r.path, r.name)
+                                                searchOpen = false
+                                                searchResults = null
+                                                searchQuery = ""
+                                                navigate("/")
+                                                vm.loadFs(targetDir)
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(
+                                            if (r.isDir) Icons.Default.Folder else Icons.Default.OpenInNew,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                        Text(
+                                            joinPath(r.path, r.name),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(start = 8.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { searchOpen = false; searchResults = null; searchQuery = "" }) { Text("关闭") }
+            },
+        )
     }
 
     // ---- 密码对话框（校验 / 设置）----
@@ -700,13 +872,15 @@ private fun SelectionActionBar(
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onRename: () -> Unit,
+    onMove: () -> Unit,
+    onCopy: () -> Unit,
     onCancel: () -> Unit,
 ) {
     Surface(tonalElevation = 3.dp) {
         Column {
             HorizontalDivider()
             Text(
-                "已选  项",
+                "已选 $count 项",
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
             )
@@ -716,8 +890,9 @@ private fun SelectionActionBar(
             ) {
                 ActionItem(Icons.Default.OpenInNew, "打开") { onOpen() }
                 ActionItem(Icons.Default.Download, "下载") { onDownload() }
+                ActionItem(Icons.Default.DriveFileMove, "移动") { onMove() }
+                ActionItem(Icons.Default.ContentCopy, "复制") { onCopy() }
                 ActionItem(Icons.Default.Delete, "删除", error = true) { onDelete() }
-                ActionItem(Icons.Default.EditNote, "重命名") { onRename() }
                 ActionItem(Icons.Default.Close, "取消") { onCancel() }
             }
         }
