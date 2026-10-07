@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -176,6 +177,7 @@ fun FileBrowserScreen(
     // ---- 排序 / 搜索 / 移动复制（第①项：文件管理补全操作）----
     var sortMode by rememberSaveable { mutableStateOf(SortMode.Name) }
     var sortExpanded by remember { mutableStateOf(false) }
+    var moreExpanded by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<OpenListApi.SearchResult>?>(null) }
@@ -283,43 +285,11 @@ fun FileBrowserScreen(
                         }
                     }
                     if (!selMode) {
-                        IconButton(onClick = onOpenStorages) {
-                            Icon(Icons.Default.Storage, contentDescription = "存储源")
-                        }
-                        IconButton(onClick = { localMode = !localMode }) {
-                            Icon(
-                                if (localMode) Icons.Default.Folder else Icons.Default.Storage,
-                                contentDescription = "本地磁盘",
-                            )
-                        }
-                        IconButton(onClick = { transfersSheet = true }) {
-                            BadgedBox(
-                                badge = {
-                                    if (runningCount > 0) {
-                                        Badge { Text("$runningCount") }
-                                    }
-                                }
-                            ) {
-                                Icon(Icons.Default.SwapVert, contentDescription = "传输任务")
-                            }
-                        }
-                        IconButton(onClick = {
-                            viewMode = if (viewMode == ViewMode.List) ViewMode.Grid else ViewMode.List
-                        }) {
-                            Icon(
-                                if (viewMode == ViewMode.List) Icons.Default.GridView
-                                else Icons.Default.ViewList,
-                                contentDescription = "切换视图",
-                            )
-                        }
-                        IconButton(onClick = { vm.loadFs(currentPath) }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "刷新")
-                        }
-                        // 搜索
+                        // 搜索（对齐设计图：搜索 + 右上角设置）
                         IconButton(onClick = { searchOpen = true }) {
                             Icon(Icons.Default.Search, contentDescription = "搜索")
                         }
-                        // 排序
+                        // 排序（对齐设计图排序条）
                         Box {
                             IconButton(onClick = { sortExpanded = true }) {
                                 Icon(Icons.Default.Sort, contentDescription = "排序")
@@ -339,6 +309,40 @@ fun FileBrowserScreen(
                                 DropdownMenuItem(
                                     text = { Text(if (sortMode == SortMode.Date) "✓ 按修改时间" else "按修改时间") },
                                     onClick = { sortMode = SortMode.Date; sortExpanded = false },
+                                )
+                            }
+                        }
+                        // 右上角设置（全部功能，对齐设计图：存储源/本地磁盘/传输/视图/刷新）
+                        Box {
+                            IconButton(onClick = { moreExpanded = true }) {
+                                Icon(Icons.Default.Settings, contentDescription = "设置")
+                            }
+                            DropdownMenu(
+                                expanded = moreExpanded,
+                                onDismissRequest = { moreExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("存储源") },
+                                    onClick = { moreExpanded = false; onOpenStorages() },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("本地磁盘") },
+                                    onClick = { moreExpanded = false; localMode = !localMode },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("传输任务") },
+                                    onClick = { moreExpanded = false; transfersSheet = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("视图切换") },
+                                    onClick = {
+                                        moreExpanded = false
+                                        viewMode = if (viewMode == ViewMode.List) ViewMode.Grid else ViewMode.List
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("刷新") },
+                                    onClick = { moreExpanded = false; vm.loadFs(currentPath) },
                                 )
                             }
                         }
