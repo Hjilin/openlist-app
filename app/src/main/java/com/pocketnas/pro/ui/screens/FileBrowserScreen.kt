@@ -654,8 +654,7 @@ fun FileBrowserScreen(
                             Text("无匹配结果", modifier = Modifier.padding(top = 12.dp))
                         } else {
                             LazyColumn(modifier = Modifier.heightIn(max = 300.dp).padding(top = 8.dp)) {
-                                listItems(results.size) { i ->
-                                    val r = results[i]
+                                listItems(results) { r ->
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
