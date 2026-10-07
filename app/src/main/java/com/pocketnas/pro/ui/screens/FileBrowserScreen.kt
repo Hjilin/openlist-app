@@ -426,31 +426,8 @@ fun FileBrowserScreen(
                         selected = emptySet()
                     },
                 )
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    OutlinedButton(
-                        onClick = { mkdirDialog = true },
-                        modifier = Modifier.weight(1f).height(46.dp),
-                    ) {
-                        Icon(Icons.Default.CreateNewFolder, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("新建文件夹")
-                    }
-                    OutlinedButton(
-                        onClick = { uploadLauncher.launch(arrayOf("*/*")) },
-                        modifier = Modifier.weight(1f).height(46.dp),
-                    ) {
-                        Icon(Icons.Default.Upload, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("上传")
-                    }
-                }
             }
+            // 非多选模式下底部不再显示按钮：新建/上传已收进右上角⚙菜单与文件操作弹窗
         },
     ) { innerPadding ->
         if (localMode) {
