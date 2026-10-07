@@ -168,6 +168,21 @@ class TransferEngine(
         dispatchUpdate()
     }
 
+    /** 清空已完成（Done/Error）任务及其临时文件 */
+    fun clearDone() {
+        val doneIds = tasks.filterValues { it.state == State.Done || it.state == State.Error }.keys.toList()
+        for (id in doneIds) {
+            jobs[id]?.cancel()
+            jobs.remove(id)
+            val t = tasks.remove(id) ?: continue
+            if (t.dir == Dir.Up) uploadSessions.remove(id)
+            runCatching { File(t.localFile).delete() }
+            runCatching { File(partOf(t.localFile)).delete() }
+        }
+        persist()
+        dispatchUpdate()
+    }
+
     // ==================== 下载实现 ====================
 
     private suspend fun runDownload(t: Task) {

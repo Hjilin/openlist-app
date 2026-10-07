@@ -2,6 +2,7 @@ package com.pocketnas.pro.ui.screens
 import androidx.compose.foundation.verticalScroll
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -9,7 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,13 +21,44 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.pocketnas.pro.ui.AppViewModel
+import com.pocketnas.pro.ui.components.ExoPlayerSurface
+import com.pocketnas.pro.ui.components.rememberExoPlayer
+import kotlinx.coroutines.launch
 
 private val TextMain = Color(0xFF1B2130)
 private val TextGray = Color(0xFF9AA3B5)
 private val BgLight = Color(0xFFF3F5F9)
 
+private fun formatSize(size: Long): String = when {
+    size >= 1024L * 1024 * 1024 -> "%.1f GB".format(size.toDouble() / (1024 * 1024 * 1024))
+    size >= 1024L * 1024 -> "%.1f MB".format(size.toDouble() / (1024 * 1024))
+    size >= 1024L -> "%.0f KB".format(size.toDouble() / 1024)
+    else -> "$size B"
+}
+
 @Composable
 fun MusicScreen(vm: AppViewModel, nav: NavHostController) {
+    val scope = rememberCoroutineScope()
+    var audioList by remember { mutableStateOf<List<AppViewModel.AudioEntry>>(emptyList()) }
+    var scanning by remember { mutableStateOf(true) }
+    var current by remember { mutableStateOf<AppViewModel.AudioEntry?>(null) }
+    var playUrl by remember { mutableStateOf<String?>(null) }
+
+    // 扫描内核音频文件
+    LaunchedEffect(Unit) {
+        vm.scanAudio { list ->
+            audioList = list
+            scanning = false
+        }
+    }
+
+    // 当前选中音频生成播放地址
+    LaunchedEffect(current) {
+        playUrl = null
+        val c = current ?: return@LaunchedEffect
+        playUrl = vm.mediaUrl(c.path)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -42,7 +74,7 @@ fun MusicScreen(vm: AppViewModel, nav: NavHostController) {
             Text("播放列表", fontSize = 12.sp, color = TextGray)
         }
 
-        // 播放器卡片
+        // 播放器卡片（当前选中音频，流式播放，走内核下载地址）
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -68,30 +100,39 @@ fun MusicScreen(vm: AppViewModel, nav: NavHostController) {
                         }
                         Spacer(Modifier.width(14.dp))
                         Column {
-                            Text("背景音乐 - 夜间专注", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(
+                                current?.name ?: "未选择音频",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 1,
+                            )
                             Spacer(Modifier.height(4.dp))
-                            Text("OpenList · 本地缓存", fontSize = 12.sp, color = Color.White.copy(alpha = 0.75f))
+                            Text(
+                                if (current != null) "OpenList · ${formatSize(current!!.size)}" else "点击下方音频开始播放",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.75f),
+                            )
                         }
                     }
                     Spacer(Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("⏮", fontSize = 22.sp, color = Color.White)
-                        Spacer(Modifier.width(26.dp))
-                        Box(
+                    val url = playUrl
+                    if (current != null && !url.isNullOrBlank()) {
+                        val player = rememberExoPlayer(url, mimeType = "audio/mpeg")
+                        ExoPlayerSurface(
+                            player = player,
+                            useController = true,
                             modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(Color.White),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("▶", fontSize = 20.sp, color = Color(0xFF26345C))
-                        }
-                        Spacer(Modifier.width(26.dp))
-                        Text("⏭", fontSize = 22.sp, color = Color.White)
+                                .fillMaxWidth()
+                                .height(96.dp),
+                        )
+                    } else if (current != null) {
+                        Text(
+                            "音频流加载中…",
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.75f),
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                        )
                     }
                 }
             }
@@ -103,19 +144,40 @@ fun MusicScreen(vm: AppViewModel, nav: NavHostController) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("音频文件", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain)
-            Text("全部 ›", fontSize = 12.sp, color = TextGray)
+            Text("共 ${audioList.size} 个", fontSize = 12.sp, color = TextGray)
         }
 
-        // 示例音频列表
-        MusicItem("夜间专注.mp3", "04:12 · 9.6MB")
-        MusicItem("起风了.flac", "05:11 · 32MB")
-        MusicItem("纯音乐 - 雨声.wav", "60:00 · 605MB")
-        MusicItem("BGM 合集.m4a", "12 首 · 128MB")
+        when {
+            scanning -> {
+                CircularProgressIndicator(modifier = Modifier.padding(24.dp).align(Alignment.CenterHorizontally))
+                Text(
+                    "正在扫描内核音频…",
+                    fontSize = 13.sp,
+                    color = TextGray,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp),
+                )
+            }
+            audioList.isEmpty() -> {
+                Text(
+                    "未找到音频文件\n（请在存储源中放入音乐后刷新）",
+                    fontSize = 13.sp,
+                    color = TextGray,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            }
+            else -> {
+                audioList.forEach { a ->
+                    MusicItem(name = a.name, info = formatSize(a.size)) {
+                        current = a
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun MusicItem(name: String, info: String) {
+private fun MusicItem(name: String, info: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -124,7 +186,7 @@ private fun MusicItem(name: String, info: String) {
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(14.dp).clickableItem(onClick),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -138,9 +200,17 @@ private fun MusicItem(name: String, info: String) {
             }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextMain)
+                Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextMain, maxLines = 1)
                 Text(info, fontSize = 12.sp, color = TextGray)
             }
         }
     }
 }
+
+/** 点击修饰符封装（避免与滚动冲突） */
+private fun Modifier.clickableItem(onClick: () -> Unit): Modifier =
+    this.then(
+        Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+    )

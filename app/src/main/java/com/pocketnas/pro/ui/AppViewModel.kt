@@ -532,6 +532,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun pauseTransfer(id: String) = transferEngine.pause(id)
     fun resumeTransfer(id: String) = transferEngine.resume(id)
     fun cancelTransfer(id: String) = transferEngine.cancel(id)
+    fun clearDoneTransfers() = transferEngine.clearDone()
+    fun pauseAllTransfers() {
+        transferEngine.list().filter { it.state == TransferEngine.State.Running }.forEach { pauseTransfer(it.id) }
+    }
+
+    /** 音乐扫描条目 */
+    data class AudioEntry(val path: String, val name: String, val size: Long)
+
+    /** 扫描内核音频文件（递归深度 2：根目录 → 挂载点 → 子目录），结果回调 */
+    fun scanAudio(onResult: (List<AudioEntry>) -> Unit) {
+        viewModelScope.launch {
+            val t = ensureToken() ?: return@launch
+            val out = mutableListOf<AudioEntry>()
+            val audioExt = listOf(".mp3", ".flac", ".wav", ".m4a", ".aac", ".ogg", ".opus", ".m4b", ".wma")
+            suspend fun scan(dir: String, depth: Int) {
+                if (depth > 2) return
+                val r = safeApi { api().fsList(t, dir) } ?: return
+                for (o in r.content) {
+                    if (o.isDir) {
+                        scan(joinFsPath(dir, o.name), depth + 1)
+                    } else if (audioExt.any { o.name.lowercase().endsWith(it) }) {
+                        out += AudioEntry(joinFsPath(dir, o.name), o.name, o.size)
+                    }
+                }
+            }
+            scan("/", 0)
+            onResult(out)
+        }
+    }
+
+    private fun joinFsPath(parent: String, child: String): String =
+        if (parent.endsWith("/")) parent + child else parent + "/" + child
 
     /** 读取文件开头内容（文本预览），在 IO 线程执行 */
     suspend fun fsGetText(path: String, maxBytes: Int = 64 * 1024): String? =
