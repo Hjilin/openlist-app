@@ -42,8 +42,12 @@ fun WebAdminScreen(onBack: () -> Unit) {
                         webViewClient = WebViewClient()
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
-                        settings.useWideViewPort = true
-                        settings.loadWithOverviewMode = true
+                        // 移动模式窄视口渲染，让 openlist 响应式页面正常显示登录表单
+                        settings.useWideViewPort = false
+                        settings.loadWithOverviewMode = false
+                        settings.setSupportZoom(true)
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
                         settings.allowFileAccess = false
                         settings.allowContentAccess = false
                         // 加载本地 OpenList 内核网页
