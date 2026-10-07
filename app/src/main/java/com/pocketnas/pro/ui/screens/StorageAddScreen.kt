@@ -54,7 +54,7 @@ fun StorageAddScreen(
     vm: AppViewModel,
     onBack: () -> Unit,
 ) {
-    val drivers by vm.drivers.collectAsState()
+    val drivers by vm.driverTemplates.collectAsState()
     val driverInfo by vm.driverInfo.collectAsState()
     val notice by vm.notice.collectAsState()
 
@@ -63,7 +63,7 @@ fun StorageAddScreen(
     // 字段值：字段名 -> 字符串值
     val values = remember { mutableStateMapOf<String, String>() }
 
-    LaunchedEffect(Unit) { vm.loadDrivers() }
+    LaunchedEffect(Unit) { vm.loadDriverTemplates() }
 
     LaunchedEffect(selectedDriver) {
         if (selectedDriver != null) {
@@ -141,11 +141,11 @@ fun StorageAddScreen(
                             expanded = driverMenuExpanded,
                             onDismissRequest = { driverMenuExpanded = false },
                         ) {
-                            drivers.forEach { name ->
+                            drivers.forEach { t ->
                                 DropdownMenuItem(
-                                    text = { Text(name) },
+                                    text = { Text(t.name.ifBlank { t.driver }) },
                                     onClick = {
-                                        selectedDriver = name
+                                        selectedDriver = t.driver
                                         driverMenuExpanded = false
                                         values.clear()
                                     },
@@ -156,7 +156,7 @@ fun StorageAddScreen(
                     if (drivers.isEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "内核未启动，请先启动服务",
+                            "内核未就绪，请先启动服务",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )

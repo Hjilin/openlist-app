@@ -54,6 +54,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _drivers = MutableStateFlow<List<String>>(emptyList())
     val drivers: StateFlow<List<String>> = _drivers.asStateFlow()
 
+    /** 可用驱动模板（/api/admin/driver/list）：内核未挂载任何源时也能列出，用于「添加存储源」 */
+    private val _driverTemplates = MutableStateFlow<List<OpenListApi.DriverTemplate>>(emptyList())
+    val driverTemplates: StateFlow<List<OpenListApi.DriverTemplate>> = _driverTemplates.asStateFlow()
+
     private val _driverInfo = MutableStateFlow<OpenListApi.DriverInfo?>(null)
     val driverInfo: StateFlow<OpenListApi.DriverInfo?> = _driverInfo.asStateFlow()
 
@@ -346,6 +350,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val t = ensureToken() ?: return@launch
             _drivers.value = safeApi { api().listDriverNames(t) } ?: emptyList()
+        }
+    }
+
+    /** 加载可用驱动模板；失败（内核未启动等）时清空，供页面显示启动引导 */
+    fun loadDriverTemplates() {
+        viewModelScope.launch {
+            val t = ensureToken() ?: run {
+                _driverTemplates.value = emptyList()
+                return@launch
+            }
+            _driverTemplates.value = safeApi { api().listDriverTemplates(t) } ?: emptyList()
         }
     }
 

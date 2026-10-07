@@ -235,6 +235,27 @@ class OpenListApi(private val client: LocalHttpClient) {
     }
 
     /**
+     * 可用驱动模板（/api/admin/driver/list）：返回所有可添加的驱动（local/aliyundrive/...）。
+     * 与 listDriverNames（已启用）不同：内核刚初始化、还没有存储源时也能返回模板，供添加存储源使用。
+     */
+    data class DriverTemplate(val driver: String, val name: String)
+
+    fun listDriverTemplates(token: String): List<DriverTemplate> {
+        val resp = client.get("/api/admin/driver/list", token)
+        val list = mutableListOf<DriverTemplate>()
+        if (resp.code !in 200..299) return list
+        val json = try { JSONObject(resp.body) } catch (_: Exception) { return list }
+        if (json.optInt("code") != 200) return list
+        val arr = json.optJSONArray("data") ?: return list
+        for (i in 0 until arr.length()) {
+            val d = arr.optJSONObject(i) ?: continue
+            val driver = d.optString("driver").takeIf { it.isNotBlank() } ?: continue
+            list += DriverTemplate(driver, d.optString("name").ifBlank { driver })
+        }
+        return list
+    }
+
+    /**
      * 获取指定驱动的字段模板（用于动态表单渲染）。
      */
     fun getDriverInfo(token: String, driver: String): DriverInfo? {
