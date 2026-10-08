@@ -153,17 +153,25 @@ class OpenListApi(private val client: LocalHttpClient) {
      * 彻底解决命令行/网页重置密码失效问题）。
      */
     fun updateUserPassword(token: String, userId: Int, newPassword: String): Boolean {
-        val body = JSONObject()
-            .put("id", userId)
-            .put("password", newPassword)
-            .toString()
-        val resp = client.post("/api/admin/user/update", body, token)
-        if (resp.code !in 200..299) return false
-        return try {
-            JSONObject(resp.body).optInt("code") == 200
-        } catch (_: Exception) {
-            false
+        // 内核 v4.2.6：user/update 需要完整用户对象，只传 id+password 返回 400
+        val listResp = client.get("/api/admin/user/list?page=1&per_page=100", token)
+        if (listResp.code !in 200..299) return false
+        val listJson = try { JSONObject(listResp.body) } catch (_: Exception) { return false }
+        if (listJson.optInt("code") != 200) return false
+        val arr = listJson.optJSONObject("data")?.optJSONArray("content") ?: return false
+        for (i in 0 until arr.length()) {
+            val u = arr.optJSONObject(i) ?: continue
+            if (u.optInt("id") != userId) continue
+            u.put("password", newPassword)
+            val resp = client.post("/api/admin/user/update", u.toString(), token)
+            if (resp.code !in 200..299) return false
+            return try {
+                JSONObject(resp.body).optInt("code") == 200
+            } catch (_: Exception) {
+                false
+            }
         }
+        return false
     }
 
     /**
@@ -193,8 +201,8 @@ class OpenListApi(private val client: LocalHttpClient) {
      * 删除存储源（管理员）。
      */
     fun deleteStorage(token: String, storageId: Int): Boolean {
-        val body = JSONObject().put("id", storageId).toString()
-        val resp = client.post("/api/admin/storage/delete", body, token)
+        // 内核 v4.2.6：storage/delete 的 id 必须是 query 参数，body 传 id 返回 400
+        val resp = client.post("/api/admin/storage/delete?id=$storageId", null, token)
         if (resp.code !in 200..299) return false
         return try {
             JSONObject(resp.body).optInt("code") == 200
@@ -433,11 +441,15 @@ class OpenListApi(private val client: LocalHttpClient) {
         return try { JSONObject(resp.body).optInt("code") == 200 } catch (_: Exception) { false }
     }
 
-    /** 删除（dir 为父目录，names 为要删除的名字列表） */
+    /** 删除（dir 为父目录，names 为要删除的名字列表；内核 v4.2.6 的 names 必须拼完整路径） */
     fun fsRemove(token: String, dir: String, names: List<String>): Boolean {
+        val fullPaths = JSONArray().apply {
+            for (n in names) {
+                put(if (n.startsWith("/")) n else dir.trimEnd('/') + "/" + n)
+            }
+        }
         val body = JSONObject()
-            .put("dir", dir)
-            .put("names", JSONArray(names))
+            .put("names", fullPaths)
             .toString()
         val resp = client.post("/api/fs/remove", body, token)
         if (resp.code !in 200..299) return false

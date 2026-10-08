@@ -41,9 +41,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _loginError = MutableStateFlow<String?>(null)
     val loginError: StateFlow<String?> = _loginError.asStateFlow()
 
-    private val _status = MutableStateFlow<OpenListApi.NasStatus?>(null)
-    val status: StateFlow<OpenListApi.NasStatus?> = _status.asStateFlow()
-
     private val _users = MutableStateFlow<List<OpenListApi.UserInfo>>(emptyList())
     val users: StateFlow<List<OpenListApi.UserInfo>> = _users.asStateFlow()
 
@@ -115,8 +112,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (before != null && before != t) {
             refreshAll()
             LogStore.log("SVC", "自动刷新：token 已更新，存储/文件/媒体数据已恢复")
-        } else {
-            refreshStatus()
         }
     }
 
@@ -312,19 +307,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         LogStore.log("AUTH", "已退出登录")
     }
 
-    /** 刷新状态 / 用户 / 存储 */
+    /** 刷新用户 / 存储 */
     fun refreshAll() {
         viewModelScope.launch {
             val t = ensureToken() ?: return@launch
-            _status.value = safeApi { api().nasStatus() }
             refreshUsers()
             refreshStorages()
-        }
-    }
-
-    fun refreshStatus() {
-        viewModelScope.launch {
-            _status.value = safeApi { api().nasStatus() }
         }
     }
 
