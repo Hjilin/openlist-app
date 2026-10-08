@@ -60,7 +60,8 @@ fun WebAdminScreen(vm: AppViewModel, onBack: () -> Unit) {
                                                 "if(localStorage.getItem('token')!==want){" +
                                                 "localStorage.setItem('token',want);location.reload();" +
                                                 "}" +
-                                                "}catch(e){}})()"
+                                                "}catch(e){}})()",
+                                        null
                                     )
                                 }
                                 // OpenList 登录卡片在窄视口下可能超出顶部被裁，加载后滚到表单起始位置
