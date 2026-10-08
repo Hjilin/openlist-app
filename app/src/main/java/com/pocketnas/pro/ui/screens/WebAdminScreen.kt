@@ -18,7 +18,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pocketnas.pro.ui.AppViewModel
-import org.json.JSONObject
 
 /**
  * OpenList 原生网页管理后台（WebView 加载 127.0.0.1:5244）。
@@ -52,7 +51,8 @@ fun WebAdminScreen(vm: AppViewModel, onBack: () -> Unit) {
                                 // 统一账号：注入 App 同一 token，打开即免登录（幂等，token 相同不重复刷新）
                                 val t = token ?: ""
                                 if (t.isNotBlank()) {
-                                    val jsToken = JSONObject().put("t", t).toString()
+                                    // token 为 JWT（base64url），不含引号/反斜杠，直接拼 JSON 安全
+                                val jsToken = "{\"t\":\"$t\"}"
                                     view?.evaluateJavascript(
                                         "javascript:(function(){" +
                                                 "try{" +
