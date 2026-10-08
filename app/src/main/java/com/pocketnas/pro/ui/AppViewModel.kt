@@ -165,7 +165,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         return@withContext tok
                     }
                     LogStore.log("AUTH", "登录第 ${attempt + 1} 次失败，等待后重试")
-                    delay(1500)
+                    delay(3000)
                 }
                 null
             } catch (e: Exception) {
@@ -231,11 +231,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return null
     }
 
-    /** 获取可用的管理员密码：优先用已保存的，其次从内核日志解析随机密码，最后回退默认 */
+    /** 获取可用的管理员密码：优先从内核日志解析最新随机密码（内核每次重建 admin 都会打印），保存的密码仅作兜底 */
     private fun resolveAdminPassword(): String {
+        resolveAdminPasswordFromLogs()?.let { return it }
         val saved = AppSettingStore.getSavedLogin(getApplication()).second
         if (saved.isNotBlank() && saved != "admin123456") return saved
-        return resolveAdminPasswordFromLogs() ?: "admin123456"
+        return "admin123456"
     }
 
     /**
