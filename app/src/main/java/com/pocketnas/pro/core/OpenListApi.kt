@@ -59,9 +59,11 @@ class OpenListApi(private val client: LocalHttpClient) {
     }
 
     /**
-     * 管理员登录，返回 token；失败返回 null。
+     * 管理员登录，返回 token；失败返回 null。code 携带内核业务错误码（401=密码错、429=限流）。
      */
-    fun login(username: String, password: String): String? {
+    data class LoginResult(val token: String?, val code: Int)
+
+    fun login(username: String, password: String): LoginResult {
         val body = JSONObject()
             .put("username", username)
             .put("password", password)
@@ -69,20 +71,21 @@ class OpenListApi(private val client: LocalHttpClient) {
         val resp = client.post("/api/auth/login", body)
         if (resp.code !in 200..299) {
             LogStore.log("API", "login HTTP ${resp.code}: ${resp.body.take(300)}")
-            return null
+            return LoginResult(null, resp.code)
         }
         val json = try {
             JSONObject(resp.body)
         } catch (e: Exception) {
             // 记录真实响应体：若收到 HTML（SPA 回退/端口被占）能直接看出来源
             LogStore.log("API", "login 非JSON响应: HTTP ${resp.code} ${resp.body.take(400)}")
-            return null
+            return LoginResult(null, -1)
         }
-        if (json.optInt("code") != 200) {
-            LogStore.log("API", "login 业务失败: code=${json.optInt("code")} msg=${json.optString("message").take(100)}")
-            return null
+        val code = json.optInt("code")
+        if (code != 200) {
+            LogStore.log("API", "login 业务失败: code=$code msg=${json.optString("message").take(100)}")
+            return LoginResult(null, code)
         }
-        return json.optJSONObject("data")?.optString("token")?.takeIf { it.isNotBlank() }
+        return LoginResult(json.optJSONObject("data")?.optString("token")?.takeIf { it.isNotBlank() }, 200)
     }
 
     /**

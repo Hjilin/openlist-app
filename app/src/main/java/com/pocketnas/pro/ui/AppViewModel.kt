@@ -116,8 +116,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * 启动时校验 token：若失效则自动重新登录（用 AppSettingStore 保存的账号，
-     * 未保存时从内核日志解析随机密码或回退默认），使存储/文件/驱动列表恢复可见。
+     * 启动时自动登录/校验 token：若失效则自动重新登录（用内核日志最新随机密码），
+     * 无 token（首次启动）也自动登录，使存储/文件/驱动列表/网页后台全程免手动登录。
      */
     private suspend fun autoRevalidateToken() {
         val ctx = getApplication<Application>()
@@ -126,14 +126,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             LogStore.log("AUTH", "内核 TCP 未就绪，启动校验跳过")
             return
         }
-        val current = _token.value ?: return
-        val valid = safeApi { api().authCheck(current) } == true
-        if (!valid) {
+        val current = _token.value
+        if (current != null) {
+            val valid = safeApi { api().authCheck(current) } == true
+            if (valid) return
             LogStore.log("AUTH", "token 已失效（可能被外部登录吊销），自动重新登录")
-            val saved = AppSettingStore.getSavedLogin(ctx)
-            val user = saved.first.ifBlank { "admin" }
-            val pass = resolveAdminPassword()
-            login(user, pass)
+        }
+        // 无 token 或 token 失效：一律用内核日志最新随机密码自动登录
+        val saved = AppSettingStore.getSavedLogin(ctx)
+        val user = saved.first.ifBlank { "admin" }
+        val pass = resolveAdminPassword()
+        val tok = loginNow(user, pass)
+        if (tok != null) {
+            _token.value = tok
+            prefs.edit().putString("token", tok).apply()
+            _loggedIn.value = true
+            LogStore.log("AUTH", "启动自动登录成功: $user")
+            refreshAll()
+        } else {
+            LogStore.log("AUTH", "启动自动登录未成功（内核未就绪或被限流，用户可手动登录）")
         }
     }
 
@@ -148,16 +159,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     return@withContext null
                 }
                 val pass = password.ifBlank { resolveAdminPassword() }
+                LogStore.log("AUTH", "尝试自动登录 user=$username pass=****${pass.takeLast(2)}")
                 // 内核刚启动的初始化窗口期可能返回 HTML 错误页，重试最多 3 次
                 repeat(3) { attempt ->
-                    var tok = api().login(username.trim(), pass)
-                    if (tok == null) {
-                        api().initSetup("admin", "admin123456")
-                        tok = api().login(username.trim(), pass)
-                    }
-                    if (tok != null) {
+                    val r = api().login(username.trim(), pass)
+                    if (r.token != null) {
                         LogStore.log("AUTH", "登录成功（第 ${attempt + 1} 次尝试）")
-                        return@withContext tok
+                        return@withContext r.token
+                    }
+                    if (r.code == 429) {
+                        // 限流是持久的（正确密码也会被拒），必须停止重试，重启内核/应用才能清除
+                        LogStore.log("AUTH", "登录被限流(429)，停止重试；重启应用可清除限流")
+                        return@withContext null
+                    }
+                    if (r.code == 401) {
+                        api().initSetup("admin", "admin123456")
+                        val r2 = api().login(username.trim(), pass)
+                        if (r2.token != null) {
+                            LogStore.log("AUTH", "登录成功（initSetup 后重试）")
+                            return@withContext r2.token
+                        }
+                        if (r2.code == 429) {
+                            LogStore.log("AUTH", "登录被限流(429)，停止重试；重启应用可清除限流")
+                            return@withContext null
+                        }
                     }
                     LogStore.log("AUTH", "登录第 ${attempt + 1} 次失败，等待后重试")
                     delay(3000)
@@ -175,7 +200,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val adminPasswordHint: String?
         get() = resolveAdminPasswordFromLogs()
 
-    /** 确保有效 token：空 / 失效时自动用保存账号重登（内核重启后恢复数据链路的关键） */
+    /** 确保有效 token：空 / 失效时自动用日志最新密码重登（内核重启后恢复数据链路的关键） */
     suspend fun ensureToken(): String? {
         _token.value?.let {
             val valid = safeApi { api().authCheck(it) } == true
@@ -184,7 +209,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         val saved = AppSettingStore.getSavedLogin(getApplication())
         val user = saved.first.ifBlank { "admin" }
-        val pass = saved.second.ifBlank { resolveAdminPassword() }
+        // 密码一律取内核日志最新随机密码：内核每次重建 admin 都会换密码，
+        // 保存的旧密码必然 401，连续失败还会触发持久 429 限流（重启内核才清除）
+        val pass = resolveAdminPassword()
         val tok = loginNow(user, pass)
         if (tok != null) {
             _token.value = tok
@@ -192,7 +219,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _loggedIn.value = true
             LogStore.log("AUTH", "ensureToken 重登成功: $user")
         } else {
-            LogStore.log("AUTH", "ensureToken 重登失败（内核可能未就绪）")
+            LogStore.log("AUTH", "ensureToken 重登失败（内核可能未就绪或被限流）")
         }
         return _token.value
     }
@@ -219,14 +246,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * 解析内核自动生成的随机管理员密码。
      * 官方 OpenList 内核首次启动会自动创建 admin 并打印随机密码：
      *   Successfully created the admin user and the initial password is: xxxxxxxx
-     * 从 NasState 日志缓冲中匹配该行并提取密码。
+     * 取【最新】一条（内存缓冲逆序 + 磁盘日志兜底，解决启动早期缓冲未同步时回退旧密码导致的 401→429）。
      */
     private fun resolveAdminPasswordFromLogs(): String? {
-        val lines = NasState.logs.value ?: return null
-        for (line in lines) {
-            val m = Regex("initial password is: (\\S+)", RegexOption.IGNORE_CASE).find(line)
-            if (m != null) return m.groupValues[1]
+        val lines = NasState.logs.value
+        if (lines != null) {
+            for (i in lines.size - 1 downTo 0) {
+                val m = Regex("initial password is: (\\S+)", RegexOption.IGNORE_CASE).find(lines[i])
+                if (m != null) return m.groupValues[1]
+            }
         }
+        // 磁盘兜底：LogStore 落盘文件（内核启动行一定在），跨进程/缓冲延迟时可用
+        try {
+            val ctx = getApplication<Application>()
+            val f = java.io.File(ctx.getExternalFilesDir(null), "logs/pocketnas.log")
+            if (f.exists()) {
+                val tail = f.readLines().takeLast(300)
+                for (i in tail.size - 1 downTo 0) {
+                    val m = Regex("initial password is: (\\S+)", RegexOption.IGNORE_CASE).find(tail[i])
+                    if (m != null) return m.groupValues[1]
+                }
+            }
+        } catch (_: Exception) {}
         return null
     }
 
@@ -257,6 +298,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun login(username: String, password: String) {
         viewModelScope.launch {
             _loginError.value = null
+            var limited = false
             val result = withContext(Dispatchers.IO) {
                 try {
                     // 确保内核前台服务在运行（登录前拉起，防止内核未就绪崩溃）
@@ -267,21 +309,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         return@withContext null
                     }
                     val pass = password.ifBlank { resolveAdminPassword() }
-                    var tok = api().login(username.trim(), pass)
-                    if (tok == null) {
+                    LogStore.log("AUTH", "手动登录 user=$username pass=****${pass.takeLast(2)}")
+                    var r = api().login(username.trim(), pass)
+                    if (r.token == null && r.code == 401) {
                         // 系统可能未初始化——调用安装向导创建管理员
                         val initialized = api().initSetup("admin", "admin123456")
                         LogStore.log(
                             "AUTH",
                             if (initialized) "检测到未初始化，已创建默认管理员 admin" else "系统已初始化或向导不可用",
                         )
-                        if (initialized) tok = api().login(username.trim(), pass)
+                        if (initialized) r = api().login(username.trim(), pass)
                     }
-                    if (tok == null && pass != "admin123456") {
+                    if (r.token == null && r.code == 401 && pass != "admin123456") {
                         // 随机密码可能已轮换，回退默认密码再试一次
-                        tok = api().login(username.trim(), "admin123456")
+                        r = api().login(username.trim(), "admin123456")
                     }
-                    tok
+                    if (r.code == 429) {
+                        limited = true
+                        LogStore.log("AUTH", "手动登录被限流(429)，重启应用可清除")
+                    }
+                    r.token
                 } catch (e: Exception) {
                     LogStore.log("AUTH", "登录异常: ${e.message}")
                     null
@@ -294,7 +341,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 LogStore.log("AUTH", "登录成功: $username")
                 refreshAll()
             } else {
-                _loginError.value = "登录失败：账号密码错误，或尝试过多被内核限流（429）。重启应用后可重试，密码可点登录框下方的提示复制"
+                _loginError.value = if (limited) {
+                    "登录失败：尝试次数过多被内核限流（429）。请重启应用清除限流后重试，密码可点登录框下方的提示复制"
+                } else {
+                    "登录失败：账号密码错误，或尝试过多被内核限流（429）。重启应用后可重试，密码可点登录框下方的提示复制"
+                }
                 LogStore.log("AUTH", "登录失败: $username")
             }
         }

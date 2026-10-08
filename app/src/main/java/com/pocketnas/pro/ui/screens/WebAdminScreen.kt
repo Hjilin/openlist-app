@@ -13,16 +13,23 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import com.pocketnas.pro.ui.AppViewModel
+import org.json.JSONObject
 
 /**
  * OpenList 原生网页管理后台（WebView 加载 127.0.0.1:5244）。
  * 与原版 AList/OpenList 功能一致：存储源、用户、设置、离线下载等全部在网页里操作。
+ * 统一账号：App 已登录时把同一 token 注入网页 localStorage，打开后台即免登录，
+ * 与「添加存储源」登录门共用同一内核账号体系。
  */
 @androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
-fun WebAdminScreen(onBack: () -> Unit) {
+fun WebAdminScreen(vm: AppViewModel, onBack: () -> Unit) {
+    val token by vm.token.collectAsState()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -42,6 +49,20 @@ fun WebAdminScreen(onBack: () -> Unit) {
                         webViewClient = object : WebViewClient() {
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
+                                // 统一账号：注入 App 同一 token，打开即免登录（幂等，token 相同不重复刷新）
+                                val t = token ?: ""
+                                if (t.isNotBlank()) {
+                                    val jsToken = JSONObject().put("t", t).toString()
+                                    view?.evaluateJavascript(
+                                        "javascript:(function(){" +
+                                                "try{" +
+                                                "var want=" + jsToken + ".t;" +
+                                                "if(localStorage.getItem('token')!==want){" +
+                                                "localStorage.setItem('token',want);location.reload();" +
+                                                "}" +
+                                                "}catch(e){}})()"
+                                    )
+                                }
                                 // OpenList 登录卡片在窄视口下可能超出顶部被裁，加载后滚到表单起始位置
                                 view?.loadUrl(
                                     "javascript:(function(){" +

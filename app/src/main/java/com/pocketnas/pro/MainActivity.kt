@@ -169,7 +169,7 @@ private fun AppNavHost(
         composable("transfer") { TransferScreen(vm, navController) }
         composable("music") { MusicScreen(vm, navController) }
         composable("me") { MeScreen(vm, navController) }
-        composable("webadmin") { WebAdminScreen(onBack = { navController.popBackStack() }) }
+        composable("webadmin") { WebAdminScreen(vm, onBack = { navController.popBackStack() }) }
         composable("logs") { LogScreen() }
         composable("settings") { SettingsScreen(vm, onOpenWebAdmin = { navController.navigate("webadmin") }, onOpenStorages = { navController.navigate("storages") }) }
         composable("storages") { StorageScreen(vm, onAdd = { navController.navigate("storage_add") }, onBack = { navController.popBackStack() }) }
