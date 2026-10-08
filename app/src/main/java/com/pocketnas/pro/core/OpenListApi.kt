@@ -46,9 +46,16 @@ class OpenListApi(private val client: LocalHttpClient) {
             .put("password", password)
             .toString()
         val resp = client.post("/api/public/init/setup", body)
-        if (resp.code !in 200..299) return false
-        val json = JSONObject(resp.body)
-        return json.optInt("code") == 200
+        if (resp.code !in 200..299) {
+            LogStore.log("API", "initSetup HTTP ${resp.code}: ${resp.body.take(300)}")
+            return false
+        }
+        return try {
+            JSONObject(resp.body).optInt("code") == 200
+        } catch (e: Exception) {
+            LogStore.log("API", "initSetup 非JSON响应: HTTP ${resp.code} ${resp.body.take(300)}")
+            false
+        }
     }
 
     /**
@@ -60,9 +67,21 @@ class OpenListApi(private val client: LocalHttpClient) {
             .put("password", password)
             .toString()
         val resp = client.post("/api/auth/login", body)
-        if (resp.code !in 200..299) return null
-        val json = JSONObject(resp.body)
-        if (json.optInt("code") != 200) return null
+        if (resp.code !in 200..299) {
+            LogStore.log("API", "login HTTP ${resp.code}: ${resp.body.take(300)}")
+            return null
+        }
+        val json = try {
+            JSONObject(resp.body)
+        } catch (e: Exception) {
+            // 记录真实响应体：若收到 HTML（SPA 回退/端口被占）能直接看出来源
+            LogStore.log("API", "login 非JSON响应: HTTP ${resp.code} ${resp.body.take(400)}")
+            return null
+        }
+        if (json.optInt("code") != 200) {
+            LogStore.log("API", "login 业务失败: code=${json.optInt("code")} msg=${json.optString("message").take(100)}")
+            return null
+        }
         return json.optJSONObject("data")?.optString("token")?.takeIf { it.isNotBlank() }
     }
 
@@ -246,6 +265,19 @@ class OpenListApi(private val client: LocalHttpClient) {
         if (resp.code !in 200..299) return list
         val json = try { JSONObject(resp.body) } catch (_: Exception) { return list }
         if (json.optInt("code") != 200) return list
+        // OpenList v4 的 data 是「驱动名 → 字段模板」对象，如 {"115 Cloud":{"common":[...]}}
+        // 兼容旧版数组结构：data 为 [{"driver":"...","name":"..."}]
+        val obj = json.optJSONObject("data")
+        if (obj != null) {
+            val names = obj.names() ?: return list
+            for (i in 0 until names.length()) {
+                val driver = names.optString(i).takeIf { it.isNotBlank() } ?: continue
+                val meta = obj.optJSONObject(driver)
+                val display = meta?.optString("name")?.takeIf { it.isNotBlank() } ?: driver
+                list += DriverTemplate(driver, display)
+            }
+            return list
+        }
         val arr = json.optJSONArray("data") ?: return list
         for (i in 0 until arr.length()) {
             val d = arr.optJSONObject(i) ?: continue
