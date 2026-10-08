@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+<title>OpenList · 管理后台（123 网盘风格原型）</title>
+<style>
+  :root{
+    --primary:#2f6bff;
+    --primary-dark:#1f4fe0;
+    --primary-soft:#eaf1ff;
+    --primary-grad:linear-gradient(135deg,#3a7bff 0%,#6a5cff 100%);
+    --bg:#f4f6fb;
+    --panel:#ffffff;
+    --line:#e9edf5;
+    --text:#1d2330;
+    --text-2:#5b6577;
+    --text-3:#97a0b3;
+    --ok:#1fb673;
+    --warn:#ff9d2e;
+    --danger:#ff5b6a;
+    --radius:12px;
+    --shadow:0 6px 24px rgba(31,79,224,.08);
+    --shadow-sm:0 2px 10px rgba(29,35,48,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#d3dae8;border-radius:8px}
+  ::-webkit-scrollbar-thumb:hover{background:#bcc6da}
+
+  /* ---------- 登录页 ---------- */
+  .login{position:fixed;inset:0;display:flex;background:
+      radial-gradient(1200px 600px at 80% -10%,rgba(106,92,255,.18),transparent 60%),
+      radial-gradient(900px 500px at -10% 110%,rgba(47,107,255,.18),transparent 60%),
+      linear-gradient(180deg,#eef3ff,#f4f6fb);}
+  .login-card{margin:auto;width:380px;background:#fff;border-radius:18px;box-shadow:var(--shadow);padding:38px 34px;}
+  .brand{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+  .brand .logo{width:46px;height:46px;border-radius:13px;background:var(--primary-grad);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px;box-shadow:0 6px 16px rgba(47,107,255,.35)}
+  .brand .name{font-size:19px;font-weight:800;letter-spacing:.3px}
+  .brand .name small{display:block;font-size:11px;color:var(--text-3);font-weight:500;letter-spacing:.5px}
+  .login h2{font-size:16px;margin-bottom:18px;color:var(--text-2)}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--text-2);margin-bottom:6px}
+  .field input{width:100%;height:42px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:14px;transition:.2s;background:#fbfcfe}
+  .field input:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px var(--primary-soft)}
+  .row{display:flex;align-items:center;justify-content:space-between;margin:6px 0 20px;font-size:12px;color:var(--text-2)}
+  .row label{display:flex;align-items:center;gap:6px;cursor:pointer}
+  .row a{color:var(--primary)}
+  .btn{width:100%;height:44px;border-radius:11px;background:var(--primary-grad);color:#fff;font-size:15px;font-weight:700;letter-spacing:1px;transition:.2s;box-shadow:0 8px 20px rgba(47,107,255,.3)}
+  .btn:hover{filter:brightness(1.05);transform:translateY(-1px)}
+  .btn:active{transform:translateY(0)}
+  .login-foot{margin-top:18px;text-align:center;font-size:12px;color:var(--text-3)}
+
+  /* ---------- 主框架 ---------- */
+  .app{display:none;height:100vh;grid-template-columns:232px 1fr;grid-template-rows:100vh}
+  .app.show{display:grid}
+  .side{background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px}
+  .side .brand{margin:6px 6px 18px}
+  .side .brand .logo{width:38px;height:38px;font-size:17px;border-radius:11px}
+  .nav{display:flex;flex-direction:column;gap:4px}
+  .nav a{padding:11px 14px;border-radius:10px;color:var(--text-2);font-weight:600;display:flex;align-items:center;gap:11px;font-size:14px;transition:.18s}
+  .nav a .ic{width:18px;height:18px;flex:none;opacity:.8}
+  .nav a:hover{background:#f3f6fd;color:var(--text)}
+  .nav a.active{background:var(--primary-soft);color:var(--primary)}
+  .nav a.active .ic{opacity:1}
+  .side-foot{margin-top:auto;padding:12px 10px;border-top:1px solid var(--line);font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(31,182,115,.18)}
+
+  .main{display:flex;flex-direction:column;min-width:0}
+  .topbar{height:60px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 22px}
+  .topbar .crumb{font-size:15px;font-weight:700}
+  .topbar .search{flex:1;max-width:420px;margin-left:8px;position:relative}
+  .topbar .search input{width:100%;height:38px;border:1px solid var(--line);border-radius:20px;padding:0 16px 0 38px;background:#f6f8fc;font-size:13px}
+  .topbar .search input:focus{outline:none;border-color:var(--primary);background:#fff}
+  .topbar .search svg{position:absolute;left:13px;top:10px;opacity:.5}
+  .topbar .act{margin-left:auto;display:flex;align-items:center;gap:14px}
+  .avatar{width:36px;height:36px;border-radius:50%;background:var(--primary-grad);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .icon-btn{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text-2);transition:.18s}
+  .icon-btn:hover{background:#f3f6fd;color:var(--primary)}
+
+  .content{padding:22px;overflow:auto;flex:1}
+  .panel{display:none;animation:fade .25s ease}
+  .panel.show{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .panel h3{font-size:18px;margin-bottom:4px}
+  .panel .sub{color:var(--text-3);font-size:13px;margin-bottom:18px}
+
+  /* 卡片 */
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow-sm)}
+  .card .t{font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:8px}
+  .card .v{font-size:26px;font-weight:800;margin-top:8px;letter-spacing:.5px}
+  .card .d{font-size:12px;color:var(--ok);margin-top:6px}
+  .card .ic{width:30px;height:30px;border-radius:9px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center}
+
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden}
+  .box .hd{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .box .hd .ttl{font-weight:700}
+  .box .hd .spacer{margin-left:auto}
+
+  /* 工具栏/面包屑 */
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .tb{padding:9px 14px;border-radius:9px;background:var(--primary);color:#fff;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:6px;transition:.18s}
+  .tb:hover{filter:brightness(1.05)}
+  .tb.ghost{background:#fff;color:var(--text);border:1px solid var(--line)}
+  .tb.ghost:hover{border-color:var(--primary);color:var(--primary)}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);margin-bottom:14px}
+  .breadcrumb b{color:var(--text)}
+  .breadcrumb span{color:var(--text-3)}
+
+  /* 文件列表 */
+  .files{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .fhead,.frow{display:grid;grid-template-columns:34px 1fr 110px 120px 90px;align-items:center;padding:0 18px;gap:10px}
+  .fhead{height:42px;background:#fafbfe;border-bottom:1px solid var(--line);font-size:12px;color:var(--text-3);font-weight:600}
+  .frow{height:50px;border-bottom:1px solid #f1f4fa;transition:.15s}
+  .frow:last-child{border-bottom:none}
+  .frow:hover{background:#f7f9fe}
+  .fname{display:flex;align-items:center;gap:11px;min-width:0}
+  .fname .fi{width:32px;height:32px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+  .fname .tx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .ft{font-size:12px;color:var(--text-3)}
+  .tag{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600}
+  .tag.ok{background:rgba(31,182,115,.12);color:var(--ok)}
+  .tag.warn{background:rgba(255,157,46,.14);color:var(--warn)}
+  .tag.off{background:#eef1f6;color:var(--text-3)}
+
+  /* 表格 */
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:13px 18px;border-bottom:1px solid #f1f4fa;font-size:13px}
+  th{font-size:12px;color:var(--text-3);font-weight:600;background:#fafbfe}
+  tr:hover td{background:#f7f9fe}
+  .pill{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;background:var(--primary-soft);color:var(--primary)}
+  .pill.g{background:rgba(31,182,115,.12);color:var(--ok)}
+
+  /* 设置 */
+  .set{display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#fff}
+  .set .menu{border-right:1px solid var(--line);padding:10px;background:#fafbfe}
+  .set .menu a{display:block;padding:10px 12px;border-radius:8px;color:var(--text-2);font-weight:600;margin-bottom:2px}
+  .set .menu a.active{background:var(--primary-soft);color:var(--primary)}
+  .set .body{padding:22px}
+  .form-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #f1f4fa}
+  .form-row .lab{width:160px;color:var(--text-2);font-weight:600}
+  .form-row .ctl{flex:1}
+  .form-row input[type=text],.form-row select{width:100%;max-width:360px;height:38px;border:1px solid var(--line);border-radius:9px;padding:0 12px;background:#fbfcfe}
+  .form-row input:focus{outline:none;border-color:var(--primary);background:#fff}
+  .switch{position:relative;width:44px;height:24px;background:#d3dae8;border-radius:20px;transition:.2s}
+  .switch.on{background:var(--primary)}
+  .switch::after{content:"";position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .switch.on::after{left:23px}
+
+  .muted{color:var(--text-3)}
+  .empty{padding:50px;text-align:center;color:var(--text-3)}
+  @media(max-width:900px){.cards{grid-template-columns:repeat(2,1fr)}.set{grid-template-columns:1fr}.set .menu{border-right:none;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+
+<!-- ============ 登录页 ============ -->
+<div class="login" id="login">
+  <div class="login-card">
+    <div class="brand">
+      <div class="logo">O</div>
+      <div class="name">OpenList<small>网盘管理 · 123 风格原型</small></div>
+    </div>
+    <h2>登录到管理后台</h2>
+    <div class="field">
+      <label>用户名 / 邮箱</label>
+      <input id="u" placeholder="admin" value="admin">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="p" placeholder="请输入密码" type="password" value="123456">
+    </div>
+    <div class="row">
+      <label><input checked type="checkbox"> 记住我</label>
+      <a href="javascript:void(0)">忘记密码？</a>
+    </div>
+    <button class="btn" onclick="apiLogin()">登 录</button>
+    <div class="login-foot">默认演示账号 admin / 123456 · 仅供自用预览</div>
+  </div>
+</div>
+
+<!-- ============ 主框架 ============ -->
+<div class="app" id="app">
+  <!-- 侧边栏 -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">O</div>
+      <div class="name">OpenList</div>
+    </div>
+    <nav class="nav">
+      <a class="active" data-p="overview"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect height="7" rx="1.5" width="7" x="3" y="3"/><rect height="7" rx="1.5" width="7" x="14" y="3"/><rect height="7" rx="1.5" width="7" x="3" y="14"/><rect height="7" rx="1.5" width="7" x="14" y="14"/></svg>概览</a>
+      <a data-p="files"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>文件管理</a>
+      <a data-p="mounts"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="8" cy="7" fill="currentColor" r="1.4"/><circle cx="8" cy="12" fill="currentColor" r="1.4"/><circle cx="8" cy="17" fill="currentColor" r="1.4"/></svg>存储管理</a>
+      <a data-p="users"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 8a3 3 0 0 1 0 0M16 14a5 5 0 0 1 4.5 5"/></svg>用户管理</a>
+      <a data-p="tasks"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/><path d="M17 16l3 3 4-5" stroke-width="2"/></svg>任务队列</a>
+      <a data-p="settings"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L16.2 3h-4l-.4 2.5a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.5h4l.4-2.5a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>系统设置</a>
+    </nav>
+    <div class="side-foot"><span class="dot"></span> 服务运行中 · v3.0.1</div>
+  </aside>
+
+  <!-- 主区 -->
+  <section class="main">
+    <header class="topbar">
+      <div class="crumb" id="crumb">概览</div>
+      <div class="search">
+        <svg fill="none" height="16" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="16"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input placeholder="搜索文件、挂载、用户…">
+      </div>
+      <div class="act">
+        <button class="icon-btn" title="通知"><svg fill="none" height="20" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="20"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
+        <div class="avatar">A</div>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- 概览 -->
+      <div class="panel show" id="p-overview">
+        <h3>概览</h3>
+        <div class="sub">欢迎回来，admin · 数据每 30 秒自动刷新</div>
+        <div class="cards">
+          <div class="card"><div class="t"><span class="ic">💾</span>已用存储</div><div class="v" id="stUsed">-</div><div class="d">实时统计</div></div>
+          <div class="card"><div class="t"><span class="ic">📁</span>文件总数</div><div class="v" id="stFiles">-</div><div class="d">全部挂载源</div></div>
+          <div class="card"><div class="t"><span class="ic">🔗</span>挂载源</div><div class="v" id="stMounts">-</div><div class="d">含离线源</div></div>
+          <div class="card"><div class="t"><span class="ic">👥</span>在线用户</div><div class="v" id="stUsers">-</div><div class="d">仅 admin</div></div>
+        </div>
+        <div class="box"><div class="hd"><span class="ttl">挂载源状态</span><span class="spacer"></span><span class="muted" style="font-size:12px" id="ovRefresh">刷新中…</span></div><table><thead><tr><th>挂载名称</th><th>驱动</th><th>路径</th><th>状态</th><th>备注</th></tr></thead><tbody id="ovTable"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table></div></div>
+
+      <!-- 文件管理 -->
+      <div class="panel" id="p-files">
+        <h3>文件管理</h3>
+        <div class="sub">浏览与管理所有挂载源中的文件</div>
+        <div class="toolbar" id="fileToolbar" style="display:none"><button class="tb" onclick="doUpload()">⬆ 上传</button><button class="tb ghost" onclick="doMkdir()">＋ 新建文件夹</button><button class="tb ghost" onclick="doRename()">✎ 重命名</button><button class="tb ghost" onclick="doDelete()">🗑 删除</button><button class="tb ghost" style="margin-left:auto" onclick="loadFiles(curPath,true)">↻ 刷新</button></div><div class="breadcrumb" id="fileCrumb"></div><div class="files"><div class="fhead"><div></div><div>名称</div><div>大小</div><div>修改时间</div><div>操作</div></div><div id="fileList"></div></div></div>
+      </div>
+
+      <!-- 存储管理 -->
+      <div class="panel" id="p-mounts">
+        <h3>存储管理</h3>
+        <div class="sub">挂载各类网盘 / 对象存储 / 本地目录</div>
+        <div class="toolbar"><button class="tb" onclick="showAddMount()">＋ 添加挂载</button><button class="tb ghost" onclick="loadMounts()">↻ 全部刷新</button></div>
+        <div class="box"><table><thead><tr><th>名称</th><th>驱动</th><th>路径</th><th>状态</th><th>操作</th></tr></thead><tbody id="mountTable"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table></div>
+      </div>
+
+      <!-- 用户管理 -->
+      <div class="panel" id="p-users">
+        <h3>用户管理</h3>
+        <div class="sub">账号、角色与权限（自用环境可精简）</div>
+        <div class="toolbar"><button class="tb" onclick="showAddUser()">＋ 新建用户</button><button class="tb ghost" onclick="loadUsers()">↻ 刷新</button></div>
+        <div class="box"><table><thead><tr><th>用户名</th><th>角色</th><th>禁用</th><th>操作</th></tr></thead><tbody id="userTable"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table></div>
+      </div>
+
+      <!-- 任务队列 -->
+      <div class="panel" id="p-tasks">
+        <h3>任务队列</h3>
+        <div class="sub">上传 / 下载 / 离线下载 / 转存 任务</div>
+        <div class="box"><div class="empty">精简版内核（lite）不含任务队列接口，上传/下载请在前台「传输」页查看</div></div>
+      </div>
+
+      <!-- 系统设置 -->
+      <div class="panel" id="p-settings">
+        <h3>系统设置</h3>
+        <div class="sub">站点、安全、品牌与外观（对标 123 网盘观感）</div>
+        <div class="set">
+          <div class="menu">
+            <a class="active">常规</a><a>品牌</a><a>安全</a><a>外观</a><a>高级</a>
+          </div>
+          <div class="body">
+            <div class="form-row"><div class="lab">站点名称</div><div class="ctl"><input id="setSiteName" type="text"></div></div>
+            <div class="form-row"><div class="lab">站点公告</div><div class="ctl"><input id="setNotice" type="text"></div></div>
+            <div class="form-row"><div class="lab">默认主题</div><div class="ctl"><select id="setTheme"><option value="light">浅色（123 风格）</option><option value="dark">深色</option></select></div></div>
+            <div class="form-row"><div class="lab">主色调</div><div class="ctl"><input id="setColor" type="text" value="#2f6bff"></div></div>
+            <div class="form-row"><div class="lab">注册开放</div><div class="ctl"><div class="switch" id="swReg"></div></div></div>
+            <div class="form-row"><div class="lab">WebDAV</div><div class="ctl"><div class="switch on" id="swWebdav"></div></div></div>
+            <div class="form-row"><div class="lab">缩略图</div><div class="ctl"><div class="switch on" id="swThumb"></div></div></div>
+            <div class="toolbar" style="margin-top:18px"><button class="tb" onclick="saveSettings()">保存更改</button><button class="tb ghost" onclick="loadSettings()">重新加载</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:5244';
+let TOKEN = localStorage.getItem('openlist_token') || '';
+let curPath = '/';
+const crumbs = {overview:'概览',files:'文件管理',mounts:'存储管理',users:'用户管理',tasks:'任务队列',settings:'系统设置'};
+
+async function req(method, path, body){
+  const opt = {method, headers:{'Authorization': TOKEN}};
+  if(body !== undefined && body !== null){
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify(body);
+  }
+  const r = await fetch(API + path, opt);
+  const t = await r.text();
+  try { return {code:r.status, json:JSON.parse(t)}; } catch(e){ return {code:r.status, json:null, html:t}; }
+}
+function esc(x){ return String(x==null?'':x).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtSize(n){ if(n==null) return '—'; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; if(n<1073741824) return (n/1048576).toFixed(1)+' MB'; return (n/1073741824).toFixed(2)+' GB'; }
+
+async function apiLogin(){
+  const u = document.getElementById('u').value.trim(), p = document.getElementById('p').value;
+  if(!u || !p) return alert('请输入用户名和密码');
+  const r = await req('POST', '/api/auth/login', {username:u, password:p});
+  if(r.json && r.json.code === 200){
+    TOKEN = r.json.data.token;
+    localStorage.setItem('openlist_token', TOKEN);
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').classList.add('show');
+    loadAll();
+  } else if(r.json && r.json.code === 429){
+    alert('登录失败次数过多，内核已限流，请稍后再试');
+  } else {
+    alert('登录失败：' + (r.json && r.json.message ? r.json.message : (r.html ? '内核未就绪（返回网页）' : '未知错误')));
+  }
+}
+
+async function loadAll(){
+  if(!TOKEN) return;
+  const t = await req('GET','/api/me');
+  if(t.json && t.json.code===200){
+    document.querySelector('.avatar').textContent = (t.json.data.username || 'A').slice(0,1).toUpperCase();
+    document.getElementById('p-overview').querySelector('.sub').textContent = '欢迎回来，' + t.json.data.username + ' · 数据实时刷新';
+  }
+  loadOverview(); loadMounts(); loadUsers(); loadSettings();
+}
+
+async function loadOverview(){
+  const r = await req('GET','/api/admin/storage/list?page=1&per_page=100');
+  if(!(r.json && r.json.code===200)){ document.getElementById('ovTable').innerHTML = '<tr><td colspan="5" class="empty">内核未就绪</td></tr>'; return; }
+  const list = (r.json.data && r.json.data.content) || [];
+  const okN = list.filter(x=>(x.status||'')==='work').length;
+  document.getElementById('stMounts').textContent = list.length;
+  document.getElementById('stFiles').textContent = okN + ' 个可用';
+  document.getElementById('stUsers').textContent = 'admin';
+  document.getElementById('stUsed').textContent = okN + ' / ' + list.length;
+  let rows = '';
+  for(const st of list){
+    const ok = (st.status||'')==='work';
+    rows += '<tr><td>'+esc(st.remark||st.mount_path)+'</td><td><span class="pill">'+esc(st.driver)+'</span></td><td class="mono">'+esc(st.mount_path)+'</td>'+
+      '<td><span class="tag '+(ok?'ok':'warn')+'">'+(ok?'正常':esc(st.status||'未初始化').slice(0,18))+'</span></td><td>'+esc(st.id)+'</td></tr>';
+  }
+  document.getElementById('ovTable').innerHTML = rows || '<tr><td colspan="5" class="empty">暂无挂载源，到「存储管理」添加</td></tr>';
+  document.getElementById('ovRefresh').textContent = '更新于 ' + new Date().toLocaleTimeString();
+}
+
+async function loadFiles(path, refresh){
+  curPath = path || '/';
+  const r = await req('POST','/api/fs/list',{path:curPath,password:'',page:1,per_page:200,refresh:!!refresh});
+  document.getElementById('fileToolbar').style.display = 'flex';
+  if(!(r.json && r.json.code===200)){
+    document.getElementById('fileCrumb').innerHTML = '<b>根目录</b><span>/</span>';
+    document.getElementById('fileList').innerHTML = '<div class="empty">'+(r.json&&r.json.message?esc(r.json.message):'内核未就绪')+'</div>';
+    return;
+  }
+  const data = r.json.data;
+  const segs = curPath.split('/').filter(Boolean);
+  let crumb = '<b>根目录</b>';
+  let acc = '';
+  segs.forEach((seg,i)=>{
+    acc += '/' + seg;
+    crumb += '<span>/</span>' + (i===segs.length-1 ? '<b>'+esc(seg)+'</b>' : '<a href="javascript:goDir(\''+acc+'\')" style="color:var(--primary)">'+esc(seg)+'</a>');
+  });
+  document.getElementById('fileCrumb').innerHTML = crumb;
+  const content = data.content || [];
+  const up = data.write !== false;
+  let rows = '';
+  if(curPath !== '/') rows += '<div class="frow"><div></div><div class="fname"><div class="fi" style="background:#6a5cff">↰</div><div class="tx"><a href="javascript:goDir(\''+curPath.replace(/\/[^\/]*$/, '')+'\')" style="color:var(--primary)">返回上级</a></div></div><div class="ft">—</div><div class="ft">—</div><div class="ft"></div></div>';
+  for(const o of content){
+    const ext = (o.name||'').split('.').pop().toLowerCase();
+    const icon = o.is_dir ? '📁' : (/^(jpg|jpeg|png|gif|webp)$/.test(ext) ? '🖼' : (/^(mp4|mkv|avi|mov)$/.test(ext) ? '🎬' : (/^(mp3|flac|wav)$/.test(ext) ? '🎵' : '📄')));
+    const bg = o.is_dir ? '#6a5cff' : (icon==='📄' ? '#2f6bff' : '#1fb673');
+    const full = curPath.replace(/\/$/,'') + '/' + o.name;
+    rows += '<div class="frow" data-path="'+esc(full)+'"><div><input type="checkbox" value="'+esc(full)+'"></div>'+
+      '<div class="fname"><div class="fi" style="background:'+bg+'">'+icon+'</div><div class="tx">'+(o.is_dir?'<a href="javascript:goDir(\''+esc(full)+'\')" style="color:var(--text)">':'')+esc(o.name)+(o.is_dir?'</a>':'')+'</div></div>'+
+      '<div class="ft">'+(o.is_dir?'—':fmtSize(o.size))+'</div><div class="ft">'+esc((o.modified||'').slice(0,10))+'</div>'+
+      '<div class="ft"><a href="javascript:downloadFile(\''+esc(full)+'\')" style="color:var(--primary)">下载</a></div></div>';
+  }
+  document.getElementById('fileList').innerHTML = rows || '<div class="empty">空目录'+(up?'，可上传或新建文件夹':'')+'</div>';
+}
+function goDir(p){ loadFiles(p, false); }
+function selPaths(){
+  return Array.from(document.querySelectorAll('#fileList .frow input:checked')).map(i=>decodeURIComponent(i.value));
+}
+async function downloadFile(path){
+  const r = await req('POST','/api/fs/link',{path});
+  if(r.json && r.json.code===200) { window.open(r.json.data.url, '_blank'); }
+  else alert('获取下载链接失败');
+}
+async function doMkdir(){
+  const name = prompt('新建文件夹名称：'); if(!name) return;
+  const r = await req('POST','/api/fs/mkdir',{path:curPath.replace(/\/$/,'')+'/'+name});
+  if(r.json && r.json.code===200) loadFiles(curPath,true); else alert(r.json&&r.json.message||'失败');
+}
+async function doRename(){
+  const ps = selPaths(); if(ps.length!==1) return alert('请勾选 1 个文件');
+  const old = ps[0]; const name = prompt('新名称：', old.split('/').pop()); if(!name) return;
+  const r = await req('POST','/api/fs/rename',{path:old, name});
+  if(r.json && r.json.code===200) loadFiles(curPath,true); else alert(r.json&&r.json.message||'失败');
+}
+async function doDelete(){
+  const ps = selPaths(); if(!ps.length) return alert('请勾选要删除的文件');
+  if(!confirm('确定删除 ' + ps.length + ' 项？')) return;
+  const r = await req('POST','/api/fs/remove',{names:ps});
+  if(r.json && r.json.code===200) loadFiles(curPath,true); else alert(r.json&&r.json.message||'失败');
+}
+function doUpload(){
+  const inp = document.createElement('input'); inp.type = 'file';
+  inp.onchange = async ()=>{
+    const file = inp.files[0]; if(!file) return;
+    const full = curPath.replace(/\/$/,'') + '/' + file.name;
+    const fd = new FormData(); fd.append('file', file);
+    const opt = {method:'PUT', headers:{'Authorization':TOKEN,'File-Path':encodeURIComponent(full),'Overwrite':'true','As-Task':'false'}, body:fd};
+    const r = await fetch(API + '/api/fs/form', opt);
+    const t = await r.text();
+    try { const j = JSON.parse(t); if(j.code===200){ loadFiles(curPath,true); return; } alert(j.message||'上传失败'); }
+    catch(e){ alert('上传失败：' + t.slice(0,80)); }
+  };
+  inp.click();
+}
+
+async function loadMounts(){
+  const r = await req('GET','/api/admin/storage/list?page=1&per_page=100');
+  if(!(r.json && r.json.code===200)){ document.getElementById('mountTable').innerHTML = '<tr><td colspan="5" class="empty">内核未就绪</td></tr>'; return; }
+  const list = (r.json.data && r.json.data.content) || [];
+  let rows = '';
+  for(const st of list){
+    const ok = (st.status||'')==='work';
+    rows += '<tr><td>'+esc(st.remark||st.mount_path)+'</td><td><span class="pill '+(st.driver==='Local'?'g':'')+'">'+esc(st.driver)+'</span></td><td class="mono">'+esc(st.mount_path)+'</td>'+
+      '<td><span class="tag '+(ok?'ok':'warn')+'">'+(ok?'已连接':esc(st.status||'未初始化').slice(0,18))+'</span></td>'+
+      '<td><a href="javascript:delMount('+st.id+',\''+esc(st.mount_path)+'\')" style="color:var(--danger)">删除</a></td></tr>';
+  }
+  document.getElementById('mountTable').innerHTML = rows || '<tr><td colspan="5" class="empty">暂无挂载源</td></tr>';
+}
+async function delMount(id, mp){
+  if(!confirm('删除挂载 ' + mp + '？')) return;
+  const r = await req('POST','/api/admin/storage/delete?id='+id);
+  if(r.json && r.json.code===200){ loadMounts(); loadOverview(); } else alert(r.json&&r.json.message||'删除失败');
+}
+async function showAddMount(){
+  const r = await req('GET','/api/admin/driver/list');
+  const drivers = (r.json && r.json.code===200) ? Object.keys(r.json.data) : [];
+  if(!drivers.length) return alert('内核未就绪，无法获取驱动列表');
+  const driver = prompt('选择驱动（' + drivers.join(' / ') + '）：', 'Local');
+  if(!driver || !drivers.includes(driver)) return alert('驱动不存在');
+  const mount = prompt('挂载路径（如 /local）：'); if(!mount) return;
+  const dr = await req('GET','/api/admin/driver/info?driver='+encodeURIComponent(driver));
+  const tpl = dr.json && dr.json.code===200 ? dr.json.data : null;
+  if(!tpl) return alert('获取驱动模板失败');
+  const common = tpl.common || [], additional = tpl.additional || [];
+  const cfg = {driver, mount_path:mount, order:0, remark:mount};
+  for(const f of common){
+    const def = f.default;
+    const raw = prompt('['+driver+' / '+f.name+'] '+(f.help||'')+'（默认 '+def+'）：', String(def==null?'':def));
+    if(raw == null) return;
+    if(f.type === 'bool') cfg[f.name] = raw === 'true';
+    else if(f.type === 'number') cfg[f.name] = Number(raw)||0;
+    else cfg[f.name] = raw;
+  }
+  let addition = {};
+  for(const f of additional){
+    const def = f.default;
+    const raw = prompt('['+driver+' / '+f.name+'] '+(f.help||'')+'（默认 '+def+'）：', String(def==null?'':def));
+    if(raw == null) return;
+    if(f.type === 'bool') addition[f.name] = raw === 'true';
+    else if(f.type === 'number') addition[f.name] = Number(raw)||0;
+    else addition[f.name] = raw;
+  }
+  cfg.addition = JSON.stringify(addition);
+  const c = await req('POST','/api/admin/storage/create', cfg);
+  if(c.json && c.json.code===200) { alert('挂载创建成功'); loadMounts(); loadOverview(); }
+  else alert(c.json && c.json.message || '创建失败');
+}
+
+async function loadUsers(){
+  const r = await req('GET','/api/admin/user/list?page=1&per_page=100');
+  if(!(r.json && r.json.code===200)){ document.getElementById('userTable').innerHTML = '<tr><td colspan="4" class="empty">内核未就绪</td></tr>'; return; }
+  const list = (r.json.data && r.json.data.content) || [];
+  let rows = '';
+  for(const u of list){
+    rows += '<tr><td>'+esc(u.username)+'</td><td><span class="pill '+(u.role===2?'':'g')+'">'+(u.role===2?'管理员':'普通用户')+'</span></td>'+
+      '<td><span class="tag '+(u.disabled?'off':'ok')+'">'+(u.disabled?'禁用':'启用')+'</span></td>'+
+      '<td><a href="javascript:resetPwd('+u.id+',\''+esc(u.username)+'\')" style="color:var(--primary)">重置密码</a></td></tr>';
+  }
+  document.getElementById('userTable').innerHTML = rows;
+}
+async function resetPwd(id, name){
+  const pwd = prompt('为用户 ' + name + ' 设置新密码：'); if(!pwd) return;
+  const u = await req('GET','/api/admin/user/list?page=1&per_page=100');
+  const arr = (u.json && u.json.data && u.json.data.content) || [];
+  const target = arr.find(x=>x.id===id);
+  if(!target) return alert('未找到用户');
+  target.password = pwd;
+  const r = await req('POST','/api/admin/user/update', target);
+  if(r.json && r.json.code===200) alert('密码已更新'); else alert(r.json&&r.json.message||'更新失败');
+}
+async function showAddUser(){
+  const name = prompt('新用户名：'); if(!name) return;
+  const pwd = prompt('密码：'); if(!pwd) return;
+  const r = await req('POST','/api/admin/user/create',{username:name, password:pwd});
+  if(r.json && r.json.code===200){ alert('用户已创建'); loadUsers(); } else alert(r.json&&r.json.message||'创建失败');
+}
+
+async function loadSettings(){
+  const r = await req('GET','/api/admin/setting/list');
+  const d = (r.json && r.json.code===200) ? r.json.data : null;
+  if(d){
+    if(document.getElementById('setSiteName')) document.getElementById('setSiteName').value = d.site_title || '';
+    if(document.getElementById('setNotice')) document.getElementById('setNotice').value = d.site_notice || '';
+    if(document.getElementById('setTheme') && d.theme) document.getElementById('setTheme').value = d.theme;
+  }
+}
+async function saveSettings(){
+  const r1 = await req('POST','/api/admin/setting/save',{key:'site_title', value:document.getElementById('setSiteName').value});
+  const r2 = await req('POST','/api/admin/setting/save',{key:'site_notice', value:document.getElementById('setNotice').value});
+  alert((r1.json&&r1.json.code===200)&&(r2.json&&r2.json.code===200) ? '已保存' : '保存失败，请检查登录状态');
+}
+
+document.querySelectorAll('.nav a').forEach(a=>{
+  a.onclick=()=>{
+    document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('show'));
+    a.classList.add('active');
+    const p = a.dataset.p;
+    document.getElementById('p-'+p).classList.add('show');
+    document.getElementById('crumb').textContent = crumbs[p];
+    if(p==='files') loadFiles('/', false);
+    if(p==='mounts') loadMounts();
+    if(p==='users') loadUsers();
+    if(p==='overview') loadOverview();
+    if(p==='settings') loadSettings();
+  };
+});
+document.querySelectorAll('.set .menu a').forEach(a=>{
+  a.onclick=()=>{document.querySelectorAll('.set .menu a').forEach(x=>x.classList.remove('active'));a.classList.add('active');};
+});
+document.querySelectorAll('.switch').forEach(s=>{s.onclick=()=>s.classList.toggle('on');});
+
+if(TOKEN){
+  req('GET','/api/me').then(t=>{ if(t.json && t.json.code===200){ document.getElementById('login').style.display='none'; document.getElementById('app').classList.add('show'); loadAll(); } });
+}
+</script>
+
+</body>
+</html>
