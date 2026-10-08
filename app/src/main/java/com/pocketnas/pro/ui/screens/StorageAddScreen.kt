@@ -162,7 +162,11 @@ fun StorageAddScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         Button(
-                            onClick = { vm.startService() },
+                            onClick = {
+                                vm.startService()
+                                // 内核可能正在启动，延迟后重新拉取驱动模板
+                                vm.loadDriverTemplates()
+                            },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text("启动内核服务")

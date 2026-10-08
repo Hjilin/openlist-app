@@ -153,14 +153,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     return@withContext null
                 }
                 val pass = password.ifBlank { resolveAdminPassword() }
-                var tok = api().login(username.trim(), pass)
-                if (tok == null) {
-                    api().initSetup("admin", "admin123456")
-                    tok = api().login(username.trim(), pass)
+                // 内核刚启动的初始化窗口期可能返回 HTML 错误页，重试最多 3 次
+                repeat(3) { attempt ->
+                    var tok = api().login(username.trim(), pass)
+                    if (tok == null) {
+                        api().initSetup("admin", "admin123456")
+                        tok = api().login(username.trim(), pass)
+                    }
+                    if (tok != null) {
+                        LogStore.log("AUTH", "登录成功（第 ${attempt + 1} 次尝试）")
+                        return@withContext tok
+                    }
+                    LogStore.log("AUTH", "登录第 ${attempt + 1} 次失败，等待后重试")
+                    delay(1500)
                 }
-                tok
+                null
             } catch (e: Exception) {
-                LogStore.log("AUTH", "loginNow 异常: ${e.message}")
+                // 记录响应体片段：非 JSON 响应（如 HTML 错误页）直接暴露，便于定位
+                val body = (e.message ?: "")
+                LogStore.log("AUTH", "loginNow 异常: ${body.take(400)}")
                 null
             }
         }
@@ -353,14 +364,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 加载可用驱动模板；失败（内核未启动等）时清空，供页面显示启动引导 */
+    /** 加载可用驱动模板；失败（内核未启动等）时清空，供页面显示启动引导。内核刚冷启动时可能未就绪，自动重试一次 */
     fun loadDriverTemplates() {
         viewModelScope.launch {
-            val t = ensureToken() ?: run {
-                _driverTemplates.value = emptyList()
-                return@launch
+            repeat(2) { attempt ->
+                val t = ensureToken()
+                if (t == null) {
+                    if (attempt == 0) { delay(2000); return@repeat }
+                    _driverTemplates.value = emptyList()
+                    return@launch
+                }
+                val list = safeApi { api().listDriverTemplates(t) } ?: emptyList()
+                if (list.isNotEmpty() || attempt == 1) {
+                    _driverTemplates.value = list
+                    return@launch
+                }
+                delay(2000)
             }
-            _driverTemplates.value = safeApi { api().listDriverTemplates(t) } ?: emptyList()
         }
     }
 
