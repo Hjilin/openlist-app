@@ -1,5 +1,6 @@
 package com.pocketnas.pro.ui.screens
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,8 +27,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -256,6 +261,33 @@ private fun DeviceInfoCard(vm: AppViewModel) {
         }
     }
 
+    // 抓取日志：打包到公共目录 + 系统分享（用于问题排查）
+    val scope = rememberCoroutineScope()
+    fun grabLogs() {
+        scope.launch(Dispatchers.IO) {
+            val f = com.pocketnas.pro.core.LogGrabber.zip(context)
+            if (f == null) {
+                withContext(Dispatchers.Main) { toast = "日志打包失败" }
+                return@launch
+            }
+            withContext(Dispatchers.Main) {
+                toast = "日志已导出：${f.absolutePath}"
+                try {
+                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                        context, "${context.packageName}.fileprovider", f
+                    )
+                    val share = Intent(Intent.ACTION_SEND)
+                        .setType("application/zip")
+                        .putExtra(Intent.EXTRA_STREAM, uri)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    context.startActivity(
+                        Intent.createChooser(share, "分享日志").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("设备", style = MaterialTheme.typography.titleMedium)
@@ -270,6 +302,9 @@ private fun DeviceInfoCard(vm: AppViewModel) {
                 }
                 TextButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/plain")) }) {
                     Text("导入配置")
+                }
+                TextButton(onClick = { grabLogs() }) {
+                    Text("抓取日志")
                 }
             }
             toast?.let {
