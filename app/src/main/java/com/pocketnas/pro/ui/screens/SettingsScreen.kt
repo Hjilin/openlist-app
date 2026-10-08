@@ -156,14 +156,17 @@ fun SettingsScreen(vm: AppViewModel, onOpenWebAdmin: () -> Unit = {}, onOpenStor
                             title = item.title,
                             desc = item.desc,
                             onClick = {
-                                when (group.title) {
-                                    "网络与共享" -> sub = SubPage.Network
-                                    "服务与自启" -> sub = SubPage.Service
-                                    "安全与密码" -> sub = SubPage.Security
-                                    "媒体库" -> sub = SubPage.MediaLib
+                                // 按条目标题分发（同组多条目时避免误路由）
+                                when (item.title) {
                                     "网页管理后台" -> onOpenWebAdmin()
                                     "存储源管理" -> onOpenStorages()
-                                    "通用" -> showLangDialog = true
+                                    "语言 / Language" -> showLangDialog = true
+                                    else -> when (group.title) {
+                                        "网络与共享" -> sub = SubPage.Network
+                                        "服务与自启" -> sub = SubPage.Service
+                                        "安全与密码" -> sub = SubPage.Security
+                                        "媒体库" -> sub = SubPage.MediaLib
+                                    }
                                 }
                             },
                         )
