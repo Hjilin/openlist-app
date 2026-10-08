@@ -176,6 +176,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
+    /** 内核最新随机密码提示（供登录界面展示，用户不知道密码时可复制） */
+    val adminPasswordHint: String?
+        get() = resolveAdminPasswordFromLogs()
+
     /** 确保有效 token：空 / 失效时自动用保存账号重登（内核重启后恢复数据链路的关键） */
     suspend fun ensureToken(): String? {
         _token.value?.let {
@@ -295,7 +299,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 LogStore.log("AUTH", "登录成功: $username")
                 refreshAll()
             } else {
-                _loginError.value = "登录失败：内核未就绪或账号密码错误（首次安装请点「打开后台」按网页提示设置密码）"
+                _loginError.value = "登录失败：账号密码错误，或尝试过多被内核限流（429）。重启应用后可重试，密码可点登录框下方的提示复制"
                 LogStore.log("AUTH", "登录失败: $username")
             }
         }

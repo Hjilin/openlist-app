@@ -39,7 +39,19 @@ fun WebAdminScreen(onBack: () -> Unit) {
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
-                        webViewClient = WebViewClient()
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                // OpenList 登录卡片在窄视口下可能超出顶部被裁，加载后滚到表单起始位置
+                                view?.loadUrl(
+                                    "javascript:(function(){" +
+                                            "try{window.scrollTo(0,0);" +
+                                            "var f=document.querySelector('form')||document.querySelector('input');" +
+                                            "if(f&&f.scrollIntoView){f.scrollIntoView({block:'start'});}" +
+                                            "}catch(e){}})()"
+                                )
+                            }
+                        }
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         // 移动模式窄视口渲染，让 openlist 响应式页面正常显示登录表单

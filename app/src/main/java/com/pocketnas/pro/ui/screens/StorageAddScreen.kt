@@ -1,5 +1,6 @@
 package com.pocketnas.pro.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,8 +41,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.pocketnas.pro.core.AppSettingStore
 import com.pocketnas.pro.core.OpenListApi
 import com.pocketnas.pro.ui.AppViewModel
 import org.json.JSONObject
@@ -57,6 +64,8 @@ fun StorageAddScreen(
     val drivers by vm.driverTemplates.collectAsState()
     val driverInfo by vm.driverInfo.collectAsState()
     val notice by vm.notice.collectAsState()
+    val loggedIn by vm.loggedIn.collectAsState()
+    val loginError by vm.loginError.collectAsState()
 
     var selectedDriver by remember { mutableStateOf<String?>(null) }
     var driverMenuExpanded by remember { mutableStateOf(false) }
@@ -64,6 +73,11 @@ fun StorageAddScreen(
     val values = remember { mutableStateMapOf<String, String>() }
 
     LaunchedEffect(Unit) { vm.loadDriverTemplates() }
+
+    // 登录成功后自动重拉驱动模板
+    LaunchedEffect(loggedIn) {
+        if (loggedIn) vm.loadDriverTemplates()
+    }
 
     LaunchedEffect(selectedDriver) {
         if (selectedDriver != null) {
@@ -155,21 +169,26 @@ fun StorageAddScreen(
                     }
                     if (drivers.isEmpty()) {
                         Spacer(Modifier.height(8.dp))
-                        Text(
-                            "内核未就绪，请先启动服务",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = {
-                                vm.startService()
-                                // 内核可能正在启动，延迟后重新拉取驱动模板
-                                vm.loadDriverTemplates()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("启动内核服务")
+                        if (!loggedIn) {
+                            // 未登录：必须先登录才能添加存储源
+                            LoginGateCard(vm, loginError)
+                        } else {
+                            Text(
+                                "内核未就绪，请先启动服务",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    vm.startService()
+                                    // 内核可能正在启动，延迟后重新拉取驱动模板
+                                    vm.loadDriverTemplates()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("启动内核服务")
+                            }
                         }
                     }
                 }
@@ -397,5 +416,87 @@ private fun FieldInput(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+/** 登录门槛卡片：未登录时显示账号密码表单，登录成功后可继续添加存储源 */
+@Composable
+private fun LoginGateCard(vm: AppViewModel, loginError: String?) {
+    val context = LocalContext.current
+    val hint = remember { vm.adminPasswordHint }
+    val saved = remember { AppSettingStore.getSavedLogin(context) }
+    var user by remember { mutableStateOf(saved.first.ifBlank { "admin" }) }
+    var pass by remember { mutableStateOf(saved.second) }
+    var showPass by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            "请先登录，登录后才能添加存储源",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+        OutlinedTextField(
+            value = user,
+            onValueChange = { user = it },
+            label = { Text("账号") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = pass,
+            onValueChange = { pass = it },
+            label = { Text("密码") },
+            singleLine = true,
+            visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { showPass = !showPass }) {
+                    Icon(
+                        if (showPass) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (showPass) "隐藏密码" else "显示密码",
+                    )
+                }
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        hint?.let {
+            Text(
+                "内核已生成初始密码：$it（点按复制）",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                as android.content.ClipboardManager
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("pwd", it))
+                        android.widget.Toast.makeText(context, "密码已复制", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+            )
+        }
+        Button(
+            onClick = {
+                busy = true
+                vm.login(user.trim(), pass)
+                busy = false
+            },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("登录")
+        }
+        loginError?.let {
+            Text(
+                it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Text(
+            "不知道密码？到设置 → 网页管理后台按页面提示操作，或在首页看日志里的初始密码",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
