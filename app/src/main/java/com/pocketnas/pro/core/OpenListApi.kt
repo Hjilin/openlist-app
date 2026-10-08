@@ -343,7 +343,7 @@ class OpenListApi(private val client: LocalHttpClient) {
         driver: String,
         commonJson: String?,
         additionJson: String?,
-    ): Boolean {
+    ): String? {
         val body = JSONObject()
             .put("driver", driver)
         if (!commonJson.isNullOrBlank()) {
@@ -356,11 +356,21 @@ class OpenListApi(private val client: LocalHttpClient) {
             body.put("addition", additionJson)
         }
         val resp = client.post("/api/admin/storage/create", body.toString(), token)
-        if (resp.code !in 200..299) return false
+        if (resp.code !in 200..299) {
+            LogStore.log("API", "storage/create HTTP ${resp.code}: ${resp.body.take(300)}")
+            return "HTTP ${resp.code}"
+        }
         return try {
-            JSONObject(resp.body).optInt("code") == 200
+            val json = JSONObject(resp.body)
+            if (json.optInt("code") == 200) null
+            else {
+                val msg = json.optString("message").take(120)
+                LogStore.log("API", "storage/create 业务失败: code=${json.optInt("code")} msg=$msg body=${resp.body.take(300)}")
+                msg
+            }
         } catch (_: Exception) {
-            false
+            LogStore.log("API", "storage/create 非JSON响应: HTTP ${resp.code} ${resp.body.take(300)}")
+            "内核返回异常响应"
         }
     }
 

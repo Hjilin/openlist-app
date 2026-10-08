@@ -391,10 +391,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     ) {
         viewModelScope.launch {
             val t = ensureToken() ?: return@launch
-            val ok = safeApi {
+            val err = safeApi {
                 api().createStorageFull(t, driver, commonJson, additionJson)
-            } ?: false
-            _notice.value = if (ok) "存储源创建成功" else "创建失败：请检查字段"
+            }
+            _notice.value = if (err == null) "存储源创建成功" else "创建失败：${err ?: "未知错误"}"
             refreshStorages()
         }
     }
