@@ -88,26 +88,21 @@ fun StorageAddScreen(
     // 驱动信息加载完后自动填充默认值
     LaunchedEffect(driverInfo) {
         val info = driverInfo ?: return@LaunchedEffect
-        val defaults = mapOf(
-            "mount_path" to "/",
-            "order" to "0",
-            "thumbnail" to "true",
-            "directory_size" to "false",
-            "webdav_policy" to "302 redirect to upstream URL",
-            "web_proxy" to "false",
-            "down_proxy_url" to "",
-            "disable_proxy_sign" to "false",
-        )
+        // 默认值以内核驱动模板为准（f.default 是权威枚举/布尔值，
+        // 不再硬编码 AList v3 旧值，避免 webdav_policy 等枚举校验失败）
         info.common.forEach { f ->
             if (values[f.name].isNullOrBlank()) {
-                values[f.name] = defaults[f.name] ?: f.default
+                values[f.name] = when {
+                    f.type == "select" && f.default.isBlank() && f.options.isNotEmpty() -> f.options.first()
+                    f.type == "bool" && f.default.isBlank() -> "false"
+                    else -> f.default
+                }
             }
         }
         info.additional.forEach { f ->
             if (values[f.name].isNullOrBlank()) {
-                // select 字段默认选第一个选项
                 values[f.name] = when {
-                    f.type == "select" && f.options.isNotEmpty() && f.default.isBlank() -> f.options.first()
+                    f.type == "select" && f.default.isBlank() && f.options.isNotEmpty() -> f.options.first()
                     f.type == "bool" && f.default.isBlank() -> "false"
                     else -> f.default
                 }

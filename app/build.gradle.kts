@@ -26,12 +26,12 @@ val nextVersionCode = buildVersionCode + 1
 
 android {
     namespace = "com.pocketnas.pro"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.pocketnas.pro"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = buildVersionCode
         versionName = buildVersionName
         resValue("string", "app_version", buildVersionName)
