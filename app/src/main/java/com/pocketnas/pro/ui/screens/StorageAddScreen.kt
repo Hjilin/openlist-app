@@ -137,7 +137,7 @@ fun StorageAddScreen(
                         onExpandedChange = { driverMenuExpanded = it },
                     ) {
                         OutlinedTextField(
-                            value = selectedDriver ?: "",
+                            value = selectedDriver?.let { zhDriverName(it) } ?: "",
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("选择网盘驱动") },
@@ -152,7 +152,7 @@ fun StorageAddScreen(
                         ) {
                             drivers.forEach { t ->
                                 DropdownMenuItem(
-                                    text = { Text(t.name.ifBlank { t.driver }) },
+                                    text = { Text(zhDriver(t)) },
                                     onClick = {
                                         selectedDriver = t.driver
                                         driverMenuExpanded = false
@@ -291,11 +291,75 @@ private fun putTyped(json: JSONObject, key: String, type: String, value: String)
 }
 
 
+// ============ 网盘驱动名 汉化映射（key=内核驱动名，value=中文显示名） ============
+private val driverZh = mapOf(
+    "Local" to "本地存储",
+    "S3" to "S3 对象存储",
+    "FTP" to "FTP",
+    "SFTP" to "SFTP",
+    "SMB" to "SMB 共享",
+    "WebDAV" to "WebDAV",
+    "115 Cloud" to "115 网盘",
+    "115 Open" to "115 网盘（开放接口）",
+    "115 Share" to "115 分享",
+    "123Pan" to "123 云盘",
+    "123 Open" to "123 开放平台",
+    "123PanLink" to "123 直链",
+    "123PanShare" to "123 分享",
+    "139Yun" to "天翼云盘",
+    "189Cloud" to "天翼云盘（189）",
+    "189CloudPC" to "天翼云盘 PC",
+    "189CloudTV" to "天翼云盘 TV",
+    "AList V3" to "AList V3",
+    "AliDoc" to "阿里云盘",
+    "BaiduNetdisk" to "百度网盘",
+    "BaiduShare" to "百度分享",
+    "CaiYun" to "彩云网盘",
+    "ChinaMobileCloud" to "中国移动云盘",
+    "CloudflareR2" to "Cloudflare R2",
+    "Dropbox" to "Dropbox",
+    "Emby" to "Emby 媒体库",
+    "FebBox" to "飞盒云",
+    "FeijiPan" to "飞机盘",
+    "GitHub API" to "GitHub API",
+    "GitHub Releases" to "GitHub Releases",
+    "GoogleDrive" to "Google 云端硬盘",
+    "GooglePhoto" to "Google 相册",
+    "GuangYaPan" to "光宇云盘",
+    "HalalCloud" to "哈拉云",
+    "HalalCloudOpen" to "哈拉云开放平台",
+    "PikPak" to "PikPak",
+    "PikPakShare" to "PikPak 分享",
+    "ProtonDrive" to "Proton 网盘",
+    "Quark" to "夸克网盘",
+    "QuarkOpen" to "夸克开放平台",
+    "QuarkTV" to "夸克 TV",
+    "Seafile" to "Seafile",
+    "Strm" to "STRM 媒体库",
+    "Teambition" to "阿里 Teambition",
+    "Thunder" to "迅雷云盘",
+    "UC" to "UC 网盘",
+    "Yandex" to "Yandex",
+    "Mega" to "MEGA",
+    "OneDrive" to "OneDrive",
+    "AliyunDrive" to "阿里云盘",
+    "AliyunShare" to "阿里云盘分享",
+)
+
+private fun zhDriver(t: OpenListApi.DriverTemplate): String {
+    val n = t.name.ifBlank { t.driver }
+    return driverZh[n] ?: driverZh[t.driver] ?: n
+}
+
+private fun zhDriverName(name: String): String = driverZh[name] ?: name
+
+
 // ============ 字段名/帮助 汉化映射 ============
 private val fieldNameZh = mapOf(
     "mount_path" to "挂载路径",
     "order" to "排序",
     "remark" to "备注",
+    "cache_expiration" to "缓存过期时间",
     "webdav_strategy" to "WebDAV 策略",
     "native_proxy" to "原生代理",
     "down_proxy_url" to "下载代理地址",
@@ -331,6 +395,9 @@ private val helpZh = mapOf(
     "Generate PDF first-page thumbnails with Quick Look on macOS" to "在 macOS 上用 Quick Look 生成 PDF 首页缩略图",
     "Number of concurrent thumbnail generation goroutines. This controls how many thumbnails can be generated in parallel." to "缩略图生成的并发数，控制并行生成缩略图的数量",
     "The position of the video thumbnail. If the value is a number (integer or floating point), it represents the time in seconds. If the value ends with '%'" to "视频缩略图位置。填数字表示秒数，填百分比表示占比",
+    "The cache expiration time for this storage" to "该存储的缓存过期时间（秒）",
+    "Cache expiration time for this storage" to "该存储的缓存过期时间（秒）",
+    "Cache expiration" to "缓存过期时间",
 )
 
 private fun zhName(name: String): String = fieldNameZh[name] ?: name
